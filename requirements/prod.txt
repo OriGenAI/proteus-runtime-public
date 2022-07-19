@@ -1,0 +1,4 @@
+python_json_logger
+requests
+certifi
+setuptools
