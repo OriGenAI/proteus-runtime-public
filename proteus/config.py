@@ -16,7 +16,9 @@ class Config(object):
     SLEEP_TIME = 30
     PROMPT = True
     AUTH_HOST = os.getenv("AUTH_HOST", "https://auth.dev.origen.ai")
-    API_HOST = os.getenv("API_HOST", "https://proteus-test.dev.origen.ai")
+    API_HOST = os.getenv(
+        "API_HOST", "https://proteus-test.dev.origen.ai"
+    )
 
     PROTEUS_USERNAME = os.getenv("PROTEUS_USERNAME")
     WORKER_USERNAME = os.getenv("WORKER_USERNAME", "user-not-configured")
