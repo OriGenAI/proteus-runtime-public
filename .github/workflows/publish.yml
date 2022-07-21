@@ -28,11 +28,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install poetry
     - name: Build package
-      run: 
+      run: |
         poetry env use `which python3.8`
         poetry shell
         poetry build
     - name: Publish package
-      run: 
+      run: |
         poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
         poetry publish
