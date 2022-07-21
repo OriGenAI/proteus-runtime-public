@@ -30,7 +30,6 @@ jobs:
     - name: Build package
       run: |
         poetry env use `which python3.8`
-        poetry shell
         poetry build
     - name: Publish package
       run: |
