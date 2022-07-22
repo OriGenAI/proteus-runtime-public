@@ -31,8 +31,8 @@ jobs:
       run: |
         poetry env use `which python3.8`
         poetry build
-    - name: Publish package
-      run: |
-        poetry config repositories.test-pypi https://test.pypi.org/legacy/
-        poetry config pypi-token.test-pypi ${{ secrets.PYPI_API_TOKEN }}
-        poetry publish -r test-pypi
+    # - name: Publish package
+    #   run: |
+    #     poetry config repositories.test-pypi https://test.pypi.org/legacy/
+    #     poetry config pypi-token.test-pypi ${{ secrets.PYPI_API_TOKEN }}
+    #     poetry publish -r test-pypi
