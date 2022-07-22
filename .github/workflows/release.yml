@@ -24,7 +24,7 @@ jobs:
           pip install poetry
       - name: Bump last released version 
         run: |
-          echo "release_proj_version=`poetry version | cut -wf 2`" >> $GITHUB_ENV
+          echo "release_proj_version=`poetry version | cut -d ' ' -f 2`" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           persist-credentials: false
@@ -32,7 +32,7 @@ jobs:
           ref: test-pypi
       - name: Bump version
         run: |
-          echo "proj_version=`poetry version | cut -wf 2`" >> $GITHUB_ENV
+          echo "proj_version=`poetry version | cut -d ' ' -f 2`" >> $GITHUB_ENV
       - name: Match versioning
         if: ${{ env.release_proj_version == env.proj_version }}
         run: |
