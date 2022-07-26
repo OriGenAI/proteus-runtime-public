@@ -1,8 +1,11 @@
 [tool.poetry]
-name = "proteus"
+name = "proteus-runtime"
 version = "0.1.4"
 description = ""
 authors = []
+packages = [
+    { include = "proteus" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -13,10 +16,42 @@ setuptools = "^63.2.0"
 
 [tool.poetry.dev-dependencies]
 python-dotenv = "0.19.2"
-black = "22.1.0"
+black = "22.6.0"
 pre-commit = "2.9.3"
 pytest = "7.1.1"
 pytest-mock = "3.5.1"
 requests-mock = "1.8.0"
 pytest-bdd = "5.0.0"
+poethepoet = "^0.16.0"
+flake8 = "^4.0.1"
 
+[tool.poe.tasks]
+    # Composing commands
+    test = ['flake8', 'black_check', 'pytest']
+    format = ["black_format"]
+
+    [tool.poe.tasks.flake8]
+        cmd="""
+            flake8 proteus
+                --max-line-length=120
+        """
+        help="Check code style using flake8"
+    [tool.poe.tasks.black_check]
+        cmd="""
+            black proteus --check --diff
+                --line-length=120
+        """
+        help="Check code style using black does not refactor"
+    [tool.poe.tasks.pytest]
+        cmd="pytest tests"
+        help="Run python tests"
+    
+    [tool.poe.tasks.black_format]
+        cmd="""
+            black . --line-length=120
+        """
+        help="Refactor using black"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
