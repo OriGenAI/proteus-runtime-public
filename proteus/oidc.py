@@ -9,15 +9,7 @@ import base64
 from functools import wraps
 import time
 
-(
-    AUTH_HOST,
-    REALM,
-    CLIENT_ID,
-    CLIENT_SECRET,
-    REFRESH_GAP,
-    USERNAME,
-    PASSWORD,
-) = (
+(AUTH_HOST, REALM, CLIENT_ID, CLIENT_SECRET, REFRESH_GAP, USERNAME, PASSWORD,) = (
     config.AUTH_HOST,
     config.REALM,
     config.CLIENT_ID,
@@ -29,9 +21,7 @@ import time
 
 
 WORKER_USERNAME_RE = re.compile(
-    r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}"
-    r"-[0-9a-f]{4}"
-    r"-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?"
+    r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}" r"-[0-9a-f]{4}" r"-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?"
 )
 
 
@@ -59,7 +49,7 @@ def may_insist_up_to(times, delay_in_secs=0):
                     if failures > 0:
                         logger.warning(f"The process tried: {failures} times")
                     else:
-                        logger.warning(f"The process has finished")
+                        logger.warning("The process has finished")
 
         return wrapped
 
@@ -129,9 +119,7 @@ class OIDC:
 
     @property
     def url(self):
-        path = (
-            f"{self.host}/realms/{self.realm}" "/protocol/openid-connect/token"
-        )
+        path = f"{self.host}/realms/{self.realm}" "/protocol/openid-connect/token"
         return path.format(self=self)
 
     def when_login(self, callback):
@@ -189,9 +177,7 @@ class OIDC:
         def perform_refresh():
             self.do_refresh()
 
-        self._refresh_timer = RepeatTimer(
-            self.expires_in - REFRESH_GAP, perform_refresh
-        )
+        self._refresh_timer = RepeatTimer(self.expires_in - REFRESH_GAP, perform_refresh)
         self._refresh_timer.start()
 
     @may_insist_up_to(5, delay_in_secs=1)

@@ -41,11 +41,7 @@ def runs_authentified(func):
         try:
             terms = dict(username=user, password=password, auto_update=True)
             is_worker = is_worker_username(user)
-            authentified = (
-                auth.do_worker_login(**terms)
-                if is_worker
-                else auth.do_login(**terms)
-            )
+            authentified = auth.do_worker_login(**terms) if is_worker else auth.do_login(**terms)
             if not authentified:
                 logger.error("Authentication failure, exiting")
                 sys.exit(1)

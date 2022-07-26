@@ -8,6 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
       - uses: actions/checkout@v3
         with:
           persist-credentials: false
@@ -15,7 +19,7 @@ jobs:
           ref: dev-release
       - name: Bump last released version 
         run: |
-          echo "release_proj_version=`grep -o '[0-9]\.[0-9]\.[0-9]' < project.py`" >> $GITHUB_ENV
+          echo "release_proj_version=`poetry version | cut -d ' ' -f 2`" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           persist-credentials: false
@@ -23,12 +27,12 @@ jobs:
           ref: dev
       - name: Bump version
         run: |
-          echo "proj_version=`grep -o '[0-9]\.[0-9]\.[0-9]' < project.py`" >> $GITHUB_ENV
-      - name: Match versioning
-        if: ${{ env.release_proj_version == env.proj_version }}
-        run: |
-          echo "The last released version is the same as the new one, please update the version on project.py"
-          exit 1
+          echo "proj_version=`poetry version | cut -d ' ' -f 2`" >> $GITHUB_ENV
+      # - name: Match versioning
+      #   if: ${{ env.release_proj_version == env.proj_version }}
+      #   run: |
+      #     echo "The last released version is the same as the new one, please update the version on project.py"
+      #     exit 1
       - name: Run squash
         run: |
           git config --local user.name $GITHUB_USERNAME
