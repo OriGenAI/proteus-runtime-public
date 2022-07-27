@@ -16,9 +16,7 @@ class Config(object):
     SLEEP_TIME = 30
     PROMPT = True
     AUTH_HOST = os.getenv("AUTH_HOST", "https://auth.dev.origen.ai")
-    API_HOST = os.getenv(
-        "API_HOST", "https://proteus-test.dev.origen.ai"
-    )
+    API_HOST = os.getenv("API_HOST", "https://proteus-test.dev.origen.ai")
 
     PROTEUS_USERNAME = os.getenv("PROTEUS_USERNAME")
     WORKER_USERNAME = os.getenv("WORKER_USERNAME", "user-not-configured")
@@ -36,9 +34,7 @@ class Config(object):
     REFRESH_GAP = 10  # Seconds
     S3_REGION = "eu-west-3"
     WORKERS_COUNT = 5
-    AZURE_STORAGE_CONNECTION_STRING = os.getenv(
-        "AZURE_STORAGE_CONNECTION_STRING"
-    )
+    AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 
     STRESS_ITERATIONS = 10
 

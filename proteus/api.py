@@ -38,9 +38,7 @@ class API:
             **(headers or {}),
         }
         url = f"{config.API_HOST}/{url}"
-        response = requests.get(
-            url, headers=headers, params=query_args, stream=stream
-        )
+        response = requests.get(url, headers=headers, params=query_args, stream=stream)
         response.raise_for_status()
         return response
 
@@ -98,9 +96,7 @@ class API:
     def download(self, url, stream=False, timeout=None):
         return self.get(url, stream=stream, timeout=timeout)
 
-    def store_download(
-        self, url, localpath, localname, stream=False, timeout=60
-    ):
+    def store_download(self, url, localpath, localname, stream=False, timeout=60):
         logger.info(f"Downloading {url} to {os.path.join(localpath)}")
 
         r = self.download(url, stream=stream, timeout=timeout)

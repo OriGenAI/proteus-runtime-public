@@ -24,9 +24,7 @@ def localname():
 
 
 @when(
-    parsers.parse(
-        "I download a file with stream={stream} and timeout={timeout}"
-    ),
+    parsers.parse("I download a file with stream={stream} and timeout={timeout}"),
     target_fixture="download_res",
 )
 def download_file(url, mocked_api_get, mocked_response, stream, timeout):
@@ -35,11 +33,7 @@ def download_file(url, mocked_api_get, mocked_response, stream, timeout):
     return api.download(url, stream=stream, timeout=timeout)
 
 
-@then(
-    parsers.parse(
-        "the file is downloaded with stream={stream} and timeout={timeout}"
-    )
-)
+@then(parsers.parse("the file is downloaded with stream={stream} and timeout={timeout}"))
 def downloaded_file(download_res, mocked_api_get, url, stream, timeout):
     stream = stream == "True"
     timeout = int(timeout) if timeout != "None" else None
@@ -56,23 +50,15 @@ def test_store(session):
     parsers.parse("I store a file with stream={stream} and timeout={timeout}"),
     target_fixture="store_res",
 )
-def store_file(
-    url, localpath, localname, mocked_api_get, mocked_response, stream, timeout
-):
+def store_file(url, localpath, localname, mocked_api_get, mocked_response, stream, timeout):
     if os.path.exists(os.path.join(localpath, localname)):
         os.remove(os.path.join(localpath, localname))
     stream = stream == "True"
     timeout = int(timeout) if timeout != "None" else None
-    return api.store_download(
-        url, localpath, localname, stream=stream, timeout=timeout
-    )
+    return api.store_download(url, localpath, localname, stream=stream, timeout=timeout)
 
 
-@then(
-    parsers.parse(
-        "the file is stored with stream={stream} and timeout={timeout}"
-    )
-)
+@then(parsers.parse("the file is stored with stream={stream} and timeout={timeout}"))
 def stored_file(
     store_res,
     mocked_api_get,
