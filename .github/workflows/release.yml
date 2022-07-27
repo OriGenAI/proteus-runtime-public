@@ -28,11 +28,11 @@ jobs:
       - name: Bump version
         run: |
           echo "proj_version=`poetry version | cut -d ' ' -f 2`" >> $GITHUB_ENV
-      # - name: Match versioning
-      #   if: ${{ env.release_proj_version == env.proj_version }}
-      #   run: |
-      #     echo "The last released version is the same as the new one, please update the version on project.py"
-      #     exit 1
+      - name: Match versioning
+        if: ${{ env.release_proj_version == env.proj_version }}
+        run: |
+          echo "The last released version is the same as the new one, please update the version on project.py"
+          exit 1
       - name: Run squash
         run: |
           git config --local user.name $GITHUB_USERNAME
@@ -59,4 +59,4 @@ jobs:
         with:
           github_token: ${{ secrets.PUBLIC_REPO_TOKEN }}
           repository: OriGenAI/proteus-runtime-public
-          branch: "update/${{ env.proj_version }}"
+          branch: "dev"
