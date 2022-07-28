@@ -4,8 +4,8 @@ from proteus import runs_authentified
 
 
 @scenario("features/runs_authentified.feature", "Execute a function authenticated")
-def test_log_info():
-    pass
+def test_log_info(session):
+    "Execute a function authenticated"
 
 
 @when(

@@ -1,3 +1,4 @@
+import pytest
 from pytest_bdd import scenario, given, when, then, parsers
 
 from proteus import Reporting, logger
@@ -19,7 +20,7 @@ def reporting_without_api():
 
 @scenario("features/reporting.feature", "Log info message")
 def test_log_info():
-    pass
+    "Log info message"
 
 
 @when(parsers.parse("I log the messsage: {msg}"))
@@ -34,7 +35,7 @@ def done_logging_info(msg, caplog):
 
 @scenario("features/reporting.feature", "Log error message")
 def test_log_error():
-    pass
+    "Log error message"
 
 
 @when(parsers.parse("I log the error messsage: {msg}"))
@@ -48,11 +49,11 @@ def done_logging_error(msg, caplog):
 
 
 @scenario("features/reporting.feature", "Send a report")
-def test_send_report(mocked_api_post, mocked_response):
-    pass
+def test_send_report(mocked_api_post, access_token_mock):
+    "Send a report"
 
 
-@given("a mocked oidc module", target_fixture="mocked_oidc")
+@pytest.fixture
 def mocked_oidc(mocker):
     mocked_oidc = mocker.patch("proteus.OIDC.worker_uuid")
     mocked_oidc.return_value = "5f276049-5dc7-4995-b91d-022dfefa8dd9"
@@ -69,9 +70,8 @@ def send_report(reporting, msg):
 
 
 @then("the mocked api is called once")
-def mocked_api_called_once(mocked_api_post, mocked_response):
+def mocked_api_called_once(mocked_api_post):
     assert mocked_api_post.called_once()
-    assert mocked_response.called_once()
 
 
 @then("the message is in the standard output")
@@ -81,10 +81,9 @@ def message_is_on_output(caplog, logged_msg):
 
 @scenario("features/reporting.feature", "Send a report without api instance")
 def test_send_report_without_api():
-    pass
+    "Send a report without api instance"
 
 
 @then("the mocked api is not called")
-def mocked_api_not_called(mocked_api_post, mocked_response):
+def mocked_api_not_called(mocked_api_post):
     mocked_api_post.assert_not_called()
-    mocked_response.assert_not_called()

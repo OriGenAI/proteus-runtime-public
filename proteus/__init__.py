@@ -47,8 +47,6 @@ def runs_authentified(func):
                 sys.exit(1)
             logger.info(f"Welcome, {auth.who}")
             return func(*args, **kwargs)
-        except Exception as error:
-            raise error
         finally:
             auth.stop()
 

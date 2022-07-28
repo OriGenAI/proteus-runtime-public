@@ -20,9 +20,7 @@ import time
 )
 
 
-WORKER_USERNAME_RE = re.compile(
-    r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}" r"-[0-9a-f]{4}" r"-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?"
-)
+WORKER_USERNAME_RE = re.compile(r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?")
 
 
 class RepeatTimer(Timer):
@@ -45,11 +43,8 @@ def may_insist_up_to(times, delay_in_secs=0):
                         raise error
                     else:
                         time.sleep(delay_in_secs)
-                finally:
-                    if failures > 0:
-                        logger.warning(f"The process tried: {failures} times")
-                    else:
-                        logger.warning("The process has finished")
+            if failures > 0:
+                logger.warning(f"The process tried: {failures} times")
 
         return wrapped
 
@@ -84,7 +79,7 @@ class OIDC:
         refresh_token=None,
         expires_in=None,
         refresh_expires_in=None,
-        **other,
+        **_,
     ):
         self._access_token = access_token
         self._refresh_token = refresh_token

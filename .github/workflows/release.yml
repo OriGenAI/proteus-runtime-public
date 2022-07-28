@@ -19,7 +19,7 @@ jobs:
           ref: dev-release
       - name: Bump last released version 
         run: |
-          echo "release_proj_version=`poetry version | cut -d ' ' -f 2`" >> $GITHUB_ENV
+          echo "release_proj_version=`poetry version -s`" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           persist-credentials: false
@@ -27,7 +27,7 @@ jobs:
           ref: dev
       - name: Bump version
         run: |
-          echo "proj_version=`poetry version | cut -d ' ' -f 2`" >> $GITHUB_ENV
+          echo "proj_version=`poetry version -s`" >> $GITHUB_ENV
       - name: Match versioning
         if: ${{ env.release_proj_version == env.proj_version }}
         run: |

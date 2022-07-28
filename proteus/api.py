@@ -33,7 +33,7 @@ class API:
 
     def get(self, url, headers=None, stream=False, **query_args):
         headers = {
-            "Authorization": "Bearer {}".format(self.auth.access_token),
+            "Authorization": f"Bearer {self.auth.access_token}",
             "Content-Type": "application/json",
             **(headers or {}),
         }
@@ -44,7 +44,7 @@ class API:
 
     def put(self, url, data, headers=None):
         headers = {
-            "Authorization": "Bearer {}".format(self.auth.access_token),
+            "Authorization": f"Bearer {self.auth.access_token}",
             "Content-Type": "application/json",
             **(headers or {}),
         }
@@ -53,7 +53,7 @@ class API:
 
     def post(self, url, data, headers=None):
         headers = {
-            "Authorization": "Bearer {}".format(self.auth.access_token),
+            "Authorization": f"Bearer {self.auth.access_token}",
             "Content-Type": "application/json",
             **(headers or {}),
         }
@@ -62,7 +62,7 @@ class API:
 
     def delete(self, url, headers={}, **query_args):
         headers = {
-            "Authorization": "Bearer {}".format(self.auth.access_token),
+            "Authorization": f"Bearer {self.auth.access_token}",
             "Content-Type": "application/json",
             **headers,
         }
@@ -73,7 +73,7 @@ class API:
 
     def _post_files(self, url, files, headers=None):
         headers = {
-            "Authorization": "Bearer {}".format(self.auth.access_token),
+            "Authorization": f"Bearer {self.auth.access_token}",
             **(headers or {}),
         }
         url = f"{config.API_HOST}/{url}"

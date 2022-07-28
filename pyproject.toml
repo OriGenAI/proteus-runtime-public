@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "proteus-runtime"
-version = "0.1.6"
+version = "0.1.7"
 description = ""
 authors = []
 packages = [
@@ -11,19 +11,21 @@ packages = [
 python = "^3.8"
 python-json-logger = "^2.0.4"
 requests = "^2.28.1"
-certifi = "2022.6.15"
+certifi = "^2022.6.15"
 setuptools = "^63.2.0"
 
 [tool.poetry.dev-dependencies]
-python-dotenv = "0.19.2"
-black = "22.6.0"
-pre-commit = "2.9.3"
-pytest = "7.1.1"
-pytest-mock = "3.5.1"
-requests-mock = "1.8.0"
-pytest-bdd = "5.0.0"
+python-dotenv = "^0.19.2"
+black = "^22.6.0"
+pre-commit = "^2.9.3"
+pytest = "^7.1.1"
+pytest-mock = "^3.5.1"
+requests-mock = "^1.8.0"
+pytest-bdd = "^5.0.0"
 poethepoet = "^0.16.0"
 flake8 = "^4.0.1"
+pytest-cov = "^3.0.0"
+PyJWT = "^2.4.0"
 
 [tool.poe.tasks]
     # Composing commands
