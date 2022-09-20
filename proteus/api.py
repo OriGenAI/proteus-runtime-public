@@ -1,5 +1,6 @@
 import os
 import requests
+from requests.adapters import HTTPAdapter, Retry
 from proteus.config import config
 from proteus.logger import logger
 from requests.exceptions import HTTPError
@@ -77,7 +78,14 @@ class API:
             **(headers or {}),
         }
         url = f"{config.API_HOST}/{url}"
-        response = requests.post(url, headers=headers, files=files)
+        
+        protocol = config.API_HOST.split('://', 1)[0]
+        protocol = 'https://' if not config.I_HOST.startswith('http') else protocol + '://'
+
+        r_session = requests.Session()
+        r_session.mount(protocol, HTTPAdapter(max_retries=Retry(total=5, backoff_factor=1)))
+
+        response = r_session.post(url, headers=headers, files=files)
         try:
             response.raise_for_status()
         except Exception as error:
