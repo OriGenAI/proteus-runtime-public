@@ -80,7 +80,7 @@ class API:
         url = f"{config.API_HOST}/{url}"
         
         protocol = config.API_HOST.split('://', 1)[0]
-        protocol = 'https://' if not config.I_HOST.startswith('http') else protocol + '://'
+        protocol = 'https://' if not config.API_HOST.startswith('http') else protocol + '://'
 
         r_session = requests.Session()
         r_session.mount(protocol, HTTPAdapter(max_retries=Retry(total=5, backoff_factor=1)))
