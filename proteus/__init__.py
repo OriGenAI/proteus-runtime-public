@@ -1,9 +1,8 @@
 import sys
 from functools import wraps
-import re
 
 from .config import config
-from .oidc import OIDC
+from .oidc import OIDC, is_worker_username
 from .api import API
 from .reporting import Reporting
 
@@ -18,11 +17,6 @@ reporting = Reporting(api)
 
 def runs_authentified(func):
     """Decorator that authentifies and keeps token updated during execution."""
-
-    WORKER_USERNAME_RE = re.compile(r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?")
-
-    def is_worker_username(username):
-        return WORKER_USERNAME_RE.match(username) is not None
 
     @wraps(func)
     def wrapper(user, password, *args, **kwargs):

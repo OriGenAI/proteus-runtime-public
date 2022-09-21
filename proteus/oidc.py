@@ -1,4 +1,5 @@
 import requests
+import re
 from proteus.decorators import may_insist_up_to
 from proteus.config import config
 from proteus.logger import logger
@@ -23,6 +24,10 @@ class RepeatTimer(Timer):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
 
+WORKER_USERNAME_RE = re.compile(r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?")
+
+def is_worker_username(username):
+    return WORKER_USERNAME_RE.match(username) is not None
 
 class OIDC:
     def __init__(
