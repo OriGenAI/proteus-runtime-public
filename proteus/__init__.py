@@ -1,15 +1,45 @@
 import sys
+from functools import wraps
+import re
+
 from .config import config
-from .oidc import OIDC, is_worker_username
+from .oidc import OIDC
 from .api import API
 from .reporting import Reporting
+
 from .logger import logger
-from functools import wraps
-import time
+from .decorators import may_insist_up_to
+
 
 auth = OIDC()
 api = API(auth)
 reporting = Reporting(api)
+
+
+def runs_authentified(func):
+    """Decorator that authentifies and keeps token updated during execution."""
+
+    WORKER_USERNAME_RE = re.compile(r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?")
+
+    def is_worker_username(username):
+        return WORKER_USERNAME_RE.match(username) is not None
+
+    @wraps(func)
+    def wrapper(user, password, *args, **kwargs):
+        global auth
+        try:
+            terms = dict(username=user, password=password, auto_update=True)
+            is_worker = is_worker_username(user)
+            authentified = auth.do_worker_login(**terms) if is_worker else auth.do_login(**terms)
+            if not authentified:
+                logger.error("Authentication failure, exiting")
+                sys.exit(1)
+            logger.info(f"Welcome, {auth.who}")
+            return func(*args, **kwargs)
+        finally:
+            auth.stop()
+
+    return wrapper
 
 
 def login(**kwargs):
@@ -31,46 +61,3 @@ def iterate_pagination(response, current=0):
 
 
 USERNAME, PASSWORD, PROMPT = config.USERNAME, config.PASSWORD, config.PROMPT
-
-
-def runs_authentified(func):
-    """Decorator that authentifies and keeps token updated during execution."""
-
-    @wraps(func)
-    def wrapper(user, password, *args, **kwargs):
-        global auth
-        try:
-            terms = dict(username=user, password=password, auto_update=True)
-            is_worker = is_worker_username(user)
-            authentified = auth.do_worker_login(**terms) if is_worker else auth.do_login(**terms)
-            if not authentified:
-                logger.error("Authentication failure, exiting")
-                sys.exit(1)
-            logger.info(f"Welcome, {auth.who}")
-            return func(*args, **kwargs)
-        finally:
-            auth.stop()
-
-    return wrapper
-
-
-def may_insist_up_to(times, delay_in_secs=0):
-    def will_retry_if_fails(fn):
-        @wraps(fn)
-        def wrapped(*args, **kwargs):
-            failures = 0
-            while failures < times:
-                try:
-                    return fn(*args, **kwargs)
-                except Exception as error:
-                    failures += 1
-                    if failures > times:
-                        raise error
-                    else:
-                        time.sleep(delay_in_secs)
-            if failures > 0:
-                logger.warning(f"The process tried: {failures} times")
-
-        return wrapped
-
-    return will_retry_if_fails

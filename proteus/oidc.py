@@ -1,6 +1,5 @@
 import requests
-import re
-from proteus import may_insist_up_to
+from proteus.decorators import may_insist_up_to
 from proteus.config import config
 from proteus.logger import logger
 from threading import Timer, Lock
@@ -17,9 +16,6 @@ import base64
     config.USERNAME,
     config.PASSWORD,
 )
-
-
-WORKER_USERNAME_RE = re.compile(r"r-(?P<uuid>[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12})(@.*)?")
 
 
 class RepeatTimer(Timer):
@@ -212,7 +208,3 @@ class OIDC:
             if robot_match is not None:
                 return robot_match.groupdict().get("uuid")
         return None
-
-
-def is_worker_username(username):
-    return WORKER_USERNAME_RE.match(username) is not None

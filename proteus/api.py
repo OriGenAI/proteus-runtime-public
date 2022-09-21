@@ -78,14 +78,7 @@ class API:
             **(headers or {}),
         }
         url = f"{config.API_HOST}/{url}"
-        
-        protocol = config.API_HOST.split('://', 1)[0]
-        protocol = 'https://' if not config.API_HOST.startswith('http') else protocol + '://'
-
-        r_session = requests.Session()
-        r_session.mount(protocol, HTTPAdapter(max_retries=Retry(total=5, backoff_factor=1)))
-
-        response = r_session.post(url, headers=headers, files=files)
+        response = requests.post(url, headers=headers, files=files)
         try:
             response.raise_for_status()
         except Exception as error:
