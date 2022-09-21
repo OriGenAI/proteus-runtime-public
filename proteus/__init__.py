@@ -1,10 +1,11 @@
 import sys
-from functools import wraps
 from .config import config
 from .oidc import OIDC, is_worker_username
 from .api import API
 from .reporting import Reporting
 from .logger import logger
+from functools import wraps
+import time
 
 auth = OIDC()
 api = API(auth)
@@ -51,3 +52,25 @@ def runs_authentified(func):
             auth.stop()
 
     return wrapper
+
+
+def may_insist_up_to(times, delay_in_secs=0):
+    def will_retry_if_fails(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            failures = 0
+            while failures < times:
+                try:
+                    return fn(*args, **kwargs)
+                except Exception as error:
+                    failures += 1
+                    if failures > times:
+                        raise error
+                    else:
+                        time.sleep(delay_in_secs)
+            if failures > 0:
+                logger.warning(f"The process tried: {failures} times")
+
+        return wrapped
+
+    return will_retry_if_fails
