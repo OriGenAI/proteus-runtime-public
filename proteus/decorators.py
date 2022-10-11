@@ -3,6 +3,7 @@ import time
 
 from .logger import logger
 
+
 def may_insist_up_to(times, delay_in_secs=0):
     def will_retry_if_fails(fn):
         @wraps(fn)

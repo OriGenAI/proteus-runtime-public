@@ -1,6 +1,5 @@
 import os
 import requests
-from requests.adapters import HTTPAdapter, Retry
 from proteus.config import config
 from proteus.logger import logger
 from requests.exceptions import HTTPError
