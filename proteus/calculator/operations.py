@@ -4,10 +4,12 @@ import math
 
 
 def _get(ref, ctx):
-    if re.match(r"\$[a-zA-Z_]", str(ref)):
+    if re.match(r"\$[a-zA-Z_][a-zA-Z0-9_]*", str(ref)):
         return ctx.get(ref[1:])
-    else:
+    elif re.match(r"\-?\d+(\.\d+)?", str(ref)):
         return ref
+    else:
+        return ref(ctx)
 
 
 operations = {
@@ -19,7 +21,7 @@ operations = {
     "'Cos' '(' E ')'  {right, 1}": lambda _, n: lambda ctx: np.cos(_get(n[2], ctx)),
     "'Tan' '(' E ')'  {right, 1}": lambda _, n: lambda ctx: np.tan(_get(n[2], ctx)),
     "'Log' '(' E ')'  {right, 1}": lambda _, n: lambda ctx: np.log10(_get(n[2], ctx)),
-    "'Pow' '(' E ';' E ')' {right, 1}": lambda _, n: lambda ctx: _get(n[2], ctx) ** _get(n[4], ctx),
+    "'Pow' '(' E ';' E ')' {left, 4}": lambda _, n: lambda ctx: np.power(_get(n[4], ctx), _get(n[2], ctx)),
     "'Exp' '(' E ')'  {right, 1}": lambda _, n: lambda ctx: math.e ** _get(n[2], ctx),
     "'If' '(' C ',' E ',' E ')' {right, 1}": lambda _, n: lambda ctx: np.where(
         _get(n[2], ctx), _get(n[4], ctx), _get(n[6], ctx)
