@@ -10,4 +10,4 @@ actions = {
     "array": lambda _, ref: ref,
 }
 
-parser = Parser(grammar, debug=True, actions=actions)
+parser = Parser(grammar, actions=actions)
