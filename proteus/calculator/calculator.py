@@ -5,7 +5,7 @@ def validate(expr):
     try:
         parser.parse(expr)
         return True
-    except:
+    except Exception:
         return False
 
 
