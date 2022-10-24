@@ -8,15 +8,15 @@ from proteus.config import config
 def _setup_logging():
     os.makedirs(config.LOG_LOC, exist_ok=True)
     loggin_path = os.path.abspath(os.path.join(os.path.abspath(os.curdir), "logging.ini"))
-    if os.path.exists(loggin_path):
-        logging.config.fileConfig(loggin_path, disable_existing_loggers=False)
-    else:
+    if not os.path.exists(loggin_path):
         loggin_path = os.path.abspath("logging.ini")
-        logging.config.fileConfig(loggin_path, disable_existing_loggers=False)
-
+    logging.config.fileConfig(loggin_path, disable_existing_loggers=False)
     azure_logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
     azure_logger.setLevel(logging.WARNING)
 
-
-_setup_logging()
-logger = logging.getLogger(__name__)
+try: 
+    _setup_logging()
+    logger = logging.getLogger(__name__)
+except KeyError:
+    # When no logging.ini present, the logger is not initialized
+    logger = None
