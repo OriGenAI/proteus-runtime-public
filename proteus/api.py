@@ -37,7 +37,7 @@ class API:
             "Content-Type": "application/json",
             **(headers or {}),
         }
-        url = f"{config.API_HOST}/{url}"
+        url = f"{config.API_HOST}/{url.strip('/')}"
         response = requests.get(url, headers=headers, params=query_args, stream=stream)
         response.raise_for_status()
         return response
@@ -48,7 +48,7 @@ class API:
             "Content-Type": "application/json",
             **(headers or {}),
         }
-        url = f"{config.API_HOST}/{url}"
+        url = f"{config.API_HOST}/{url.strip('/')}"
         return requests.put(url, headers=headers, json=data)
 
     def post(self, url, data, headers=None):
@@ -57,7 +57,7 @@ class API:
             "Content-Type": "application/json",
             **(headers or {}),
         }
-        url = f"{config.API_HOST}/{url}"
+        url = f"{config.API_HOST}/{url.strip('/')}"
         return requests.post(url, headers=headers, json=data)
 
     def delete(self, url, headers={}, **query_args):
@@ -66,7 +66,7 @@ class API:
             "Content-Type": "application/json",
             **headers,
         }
-        url = f"{config.API_HOST}/{url}"
+        url = f"{config.API_HOST}/{url.strip('/')}"
         response = requests.delete(url, headers=headers, params=query_args)
         response.raise_for_status()
         return response
@@ -76,7 +76,7 @@ class API:
             "Authorization": f"Bearer {self.auth.access_token}",
             **(headers or {}),
         }
-        url = f"{config.API_HOST}/{url}"
+        url = f"{config.API_HOST}/{url.strip('/')}"
         response = requests.post(url, headers=headers, files=files)
         try:
             response.raise_for_status()
