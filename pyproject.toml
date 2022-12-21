@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "proteus-runtime"
-version = "0.1.25"
+version = "0.1.26"
 description = ""
 authors = []
 packages = [
@@ -11,7 +11,7 @@ packages = [
 python = "^3.8"
 python-json-logger = "^2.0.4"
 requests = "^2.28.1"
-certifi = "^2022.6.15"
+certifi = "^2022.12.07"
 setuptools = "^65.0.0"
 parglare = "^0.16.0"
 numpy = "^1.23.3"
@@ -20,7 +20,7 @@ numpy = "^1.23.3"
 python-dotenv = "^0.19.2"
 black = "^22.6.0"
 pre-commit = "^2.9.3"
-pytest = "^7.1.1"
+pytest = "^7.2.0"
 pytest-mock = "^3.5.1"
 requests-mock = "^1.8.0"
 pytest-bdd = "^5.0.0"

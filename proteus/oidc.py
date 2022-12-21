@@ -1,22 +1,10 @@
 import requests
 import re
 from proteus.decorators import may_insist_up_to
-from proteus.config import config
-from proteus.logger import logger
 from threading import Timer, Lock
 import certifi
 import json
 import base64
-
-(AUTH_HOST, REALM, CLIENT_ID, CLIENT_SECRET, REFRESH_GAP, USERNAME, PASSWORD,) = (
-    config.AUTH_HOST,
-    config.REALM,
-    config.CLIENT_ID,
-    config.CLIENT_SECRET,
-    config.REFRESH_GAP,
-    config.USERNAME,
-    config.PASSWORD,
-)
 
 
 class RepeatTimer(Timer):
@@ -35,17 +23,18 @@ def is_worker_username(username):
 class OIDC:
     def __init__(
         self,
-        username=USERNAME,
-        host=AUTH_HOST,
-        realm=REALM,
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
+        config,
+        logger,
     ):
-        self.username = username
+        host = config.auth_host
+
+        self.config = config
+        self.logger = logger
+        self.username = config.username
         self.host = host if host.endswith("/auth") else host + "/auth"
-        self.realm = realm
-        self.client_id = client_id
-        self.client_secret = client_secret
+        self.realm = config.realm
+        self.client_id = config.client_id
+        self.client_secret = config.client_secret
         self._access_token_locked = Lock()
         self._last_res = None
         self._refresh_timer = None
@@ -118,11 +107,11 @@ class OIDC:
         response.raise_for_status()
         return response
 
-    def do_login(self, password=PASSWORD, username=None, auto_update=True):
+    def do_login(self, password=None, username=None, auto_update=True):
         login = {
             "grant_type": "password",
             "username": self.username if username is None else username,
-            "password": password,
+            "password": password or self.config.password,
             "client_id": self.client_id,
         }
         if self.client_secret is not None:
@@ -141,9 +130,9 @@ class OIDC:
             print(e)
 
     def do_worker_login(self, **terms):
-        self.realm = REALM
-        self.client_id = CLIENT_ID
-        self.client_secret = CLIENT_SECRET
+        self.realm = self.realm
+        self.client_id = self.client_id
+        self.client_secret = self.client_secret
         self._i_am_robot = True
         return self.do_login(**terms)
 
@@ -153,7 +142,7 @@ class OIDC:
         def perform_refresh():
             self.do_refresh()
 
-        self._refresh_timer = RepeatTimer(self.expires_in - REFRESH_GAP, perform_refresh)
+        self._refresh_timer = RepeatTimer(self.expires_in - self.config.refresh_gap, perform_refresh)
         self._refresh_timer.start()
 
     @may_insist_up_to(5, delay_in_secs=1)
@@ -183,7 +172,7 @@ class OIDC:
             assert credentials.get("access_token") is not None
             self._update_credentials(**credentials)
         except Exception:
-            logger.error("Failed.")
+            self.logger.error("Failed.")
             return self.do_login()
         finally:
             self._access_token_locked.release()

@@ -1,5 +1,7 @@
 from pytest_bdd import scenario, given, when, then
-from proteus import api
+from proteus import Proteus
+
+proteus = Proteus()
 
 
 @scenario("features/post_file.feature", "Post a file")
@@ -24,7 +26,7 @@ def content():
 
 @when("I post a file", target_fixture="response")
 def post_file(url, filepath, content):
-    return api.post_file(url, filepath, content)
+    return proteus.api.post_file(url, filepath, content)
 
 
 @then("the post file mock has been called")

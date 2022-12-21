@@ -1,10 +1,11 @@
 from functools import wraps
 import time
+import logging
 
-from .logger import logger
 
+def may_insist_up_to(times, delay_in_secs=0, logger=None):
+    logger or logging.getLogger()
 
-def may_insist_up_to(times, delay_in_secs=0):
     def will_retry_if_fails(fn):
         @wraps(fn)
         def wrapped(*args, **kwargs):

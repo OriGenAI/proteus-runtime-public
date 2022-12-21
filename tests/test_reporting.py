@@ -1,13 +1,15 @@
 import pytest
 from pytest_bdd import scenario, given, when, then, parsers
 
-from proteus import Reporting, logger
-from proteus import api
+from proteus import Proteus
+from proteus.reporting import Reporting
+
+proteus = Proteus()
 
 
 @given("a reporting instance", target_fixture="reporting")
 def reporting(session):
-    return Reporting(api)
+    return Reporting(proteus.logger, proteus.api)
 
 
 @given(
@@ -15,7 +17,7 @@ def reporting(session):
     target_fixture="reporting",
 )
 def reporting_without_api():
-    return Reporting()
+    return Reporting(proteus.logger)
 
 
 @scenario("features/reporting.feature", "Log info message")
@@ -25,7 +27,7 @@ def test_log_info():
 
 @when(parsers.parse("I log the messsage: {msg}"))
 def log_info(msg):
-    logger.info(msg)
+    proteus.logger.info(msg)
 
 
 @then(parsers.parse("I get a stdout message with: {msg}"))
@@ -40,7 +42,7 @@ def test_log_error():
 
 @when(parsers.parse("I log the error messsage: {msg}"))
 def log_error(msg):
-    logger.error(msg)
+    proteus.logger.error(msg)
 
 
 @then(parsers.parse("I get a stderr message with: {msg}"))

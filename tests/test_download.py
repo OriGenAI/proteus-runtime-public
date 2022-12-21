@@ -1,7 +1,9 @@
 import os
 import pytest
 from pytest_bdd import scenario, given, when, then, parsers
-from proteus import api
+from proteus import Proteus
+
+proteus = Proteus()
 
 
 @pytest.fixture
@@ -38,7 +40,7 @@ def localname():
 def download_file(url, mocked_api_get, access_token_mock, stream, timeout):
     stream = stream == "True"
     timeout = int(timeout) if timeout != "None" else None
-    return api.download(url, stream=stream, timeout=timeout)
+    return proteus.api.download(url, stream=stream, timeout=timeout)
 
 
 @then(parsers.parse("the file is downloaded with stream={stream} and timeout={timeout}"))
@@ -63,7 +65,7 @@ def store_file(url, localpath, localname, mocked_api_get, mocked_response, acces
         os.remove(os.path.join(localpath, localname))
     stream = stream == "True"
     timeout = int(timeout) if timeout != "None" else None
-    return api.store_download(url, localpath, localname, stream=stream, timeout=timeout)
+    return proteus.api.store_download(url, localpath, localname, stream=stream, timeout=timeout)
 
 
 @then(parsers.parse("the file is stored with stream={stream} and timeout={timeout}"))

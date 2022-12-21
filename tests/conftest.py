@@ -1,18 +1,20 @@
 import pytest
 import jwt
 from requests.models import Response
-from proteus.config import config
+from proteus.config import Config
 
 
 @pytest.fixture
 def session(requests_mock):
+    config = Config()
+
     json = {
         "access_token": jwt.encode(payload={}, key="", algorithm="HS256"),
         "refresh_token": jwt.encode(payload={}, key="", algorithm="HS256"),
         "expires_in": 300,
         "refresh_expires_in": 1800,
     }
-    return requests_mock.post(f"{config.AUTH_HOST}/auth/realms/origen/protocol/openid-connect/token", json=json)
+    return requests_mock.post(f"{config.auth_host}/auth/realms/origen/protocol/openid-connect/token", json=json)
 
 
 @pytest.fixture

@@ -1,10 +1,8 @@
-from .logger import logger
-
-
 class Reporting:
     """Unifies logging and reporting to status API"""
 
-    def __init__(self, api=None):
+    def __init__(self, logger, api=None):
+        self.logger = logger
         self.api = api
 
     def send(
@@ -28,7 +26,7 @@ class Reporting:
             number (int): The number of actual elements completed
         """
         assert status is not None, "Status can't be set to None"
-        logger.info(
+        self.logger.info(
             message,
             extra={"status": status, "progress": progress, "result": result},
         )
