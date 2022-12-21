@@ -14,7 +14,8 @@ def _setup_logging():
     azure_logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
     azure_logger.setLevel(logging.WARNING)
 
-try: 
+
+try:
     _setup_logging()
     logger = logging.getLogger(__name__)
 except KeyError:

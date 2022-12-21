@@ -17,14 +17,14 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           ref: dev-release
-      - name: Bump last released version 
+      - name: Bump last released version
         run: |
           echo "release_proj_version=`poetry version -s`" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           persist-credentials: false
           fetch-depth: 0
-          ref: dev
+          ref: dev-deploy
       - name: Bump version
         run: |
           echo "proj_version=`poetry version -s`" >> $GITHUB_ENV

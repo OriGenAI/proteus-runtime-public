@@ -1,9 +1,11 @@
 import os
+from functools import wraps
+
 import requests
+from requests.exceptions import HTTPError
+
 from proteus.config import config
 from proteus.logger import logger
-from requests.exceptions import HTTPError
-from functools import wraps
 
 
 def _refresh_authentication():
@@ -94,7 +96,7 @@ class API:
         return self._post_files(url, files, headers=headers)
 
     def download(self, url, stream=False, timeout=None):
-        return self.get(url, stream=stream, timeout=timeout)
+        return self.get(url, stream=stream, timeout=timeout, headers={"content-type": "application/octet-stream"})
 
     def store_download(self, url, localpath, localname, stream=False, timeout=60):
         logger.info(f"Downloading {url} to {os.path.join(localpath)}")
