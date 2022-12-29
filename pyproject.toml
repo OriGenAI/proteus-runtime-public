@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "proteus-runtime"
-version = "0.1.26"
+version = "0.2.1"
 description = ""
 authors = []
 packages = [
@@ -49,7 +49,7 @@ PyJWT = "^2.4.0"
     [tool.poe.tasks.pytest]
         cmd="pytest tests"
         help="Run python tests"
-    
+
     [tool.poe.tasks.black_format]
         cmd="""
             black . --line-length=120

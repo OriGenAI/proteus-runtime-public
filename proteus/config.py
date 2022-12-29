@@ -14,3 +14,4 @@ class Config:
     realm: str = "origen"
     client_id: str = "proteus-front"
     refresh_gap: int = 10  # Seconds
+    ignore_worker_status: bool = False

@@ -1,10 +1,11 @@
-import requests
-import re
-from proteus.decorators import may_insist_up_to
-from threading import Timer, Lock
-import certifi
-import json
 import base64
+import json
+import re
+from copy import deepcopy
+from threading import Timer, Lock
+
+import certifi
+import requests
 
 
 class RepeatTimer(Timer):
@@ -24,12 +25,12 @@ class OIDC:
     def __init__(
         self,
         config,
-        logger,
+        proteus,
     ):
         host = config.auth_host
 
-        self.config = config
-        self.logger = logger
+        self.config = deepcopy(config)
+        self.proteus = proteus
         self.username = config.username
         self.host = host if host.endswith("/auth") else host + "/auth"
         self.realm = config.realm
@@ -42,6 +43,10 @@ class OIDC:
         self._when_refresh_callback = None
         self._update_credentials()
         self._i_am_robot = False
+
+        # Register insists
+        self.send_login_request = proteus.may_insist_up_to(3, delay_in_secs=1)(self.send_login_request)
+        self.send_login_request = proteus.may_insist_up_to(5, delay_in_secs=1)(self.send_refresh_request)
 
     def _update_credentials(
         self,
@@ -93,7 +98,7 @@ class OIDC:
     def when_refresh(self, callback):
         self._when_refresh_callback = callback
 
-    @may_insist_up_to(3, delay_in_secs=1)
+    # @may_insist_up_to(3, delay_in_secs=1)
     def send_login_request(self, login):
         response = requests.post(
             self.url,
@@ -145,7 +150,7 @@ class OIDC:
         self._refresh_timer = RepeatTimer(self.expires_in - self.config.refresh_gap, perform_refresh)
         self._refresh_timer.start()
 
-    @may_insist_up_to(5, delay_in_secs=1)
+    # @may_insist_up_to(5, delay_in_secs=1)
     def send_refresh_request(self, refresh):
         response = requests.post(
             self.url,
@@ -172,7 +177,7 @@ class OIDC:
             assert credentials.get("access_token") is not None
             self._update_credentials(**credentials)
         except Exception:
-            self.logger.error("Failed.")
+            self.proteus.logger.error("Failed.")
             return self.do_login()
         finally:
             self._access_token_locked.release()

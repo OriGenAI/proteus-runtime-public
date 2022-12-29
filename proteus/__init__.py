@@ -1,20 +1,19 @@
 import sys
+import time
 from functools import wraps
 
-from .config import Config
-from .oidc import OIDC, is_worker_username
 from .api import API
-from .reporting import Reporting
-
+from .config import Config
 from .logger import initialize_logger
-from .decorators import may_insist_up_to
+from .oidc import OIDC, is_worker_username
+from .reporting import Reporting
 
 
 class Proteus:
     def __init__(self, config: Config = None) -> None:
         self.config = config or Config()
         self.logger = initialize_logger(self.config.log_loc)
-        self.auth = OIDC(self.config, self.logger)
+        self.auth = OIDC(self.config, self)
         self.api = API(self.auth, self.config, self.logger)
         self.reporting = Reporting(self.logger, self.api)
 
@@ -37,8 +36,29 @@ class Proteus:
 
         return wrapper
 
-    def may_insist_up_to(self, times: int, delay_in_secs: int = 0):
-        return may_insist_up_to(times, delay_in_secs, logger=self.logger)
+    def may_insist_up_to(self, times, delay_in_secs=0, logger=None):
+        logger = logger or self.logger
+
+        def will_retry_if_fails(fn):
+            @wraps(fn)
+            def wrapped(*args, **kwargs):
+                failures = 0
+                while True:
+                    try:
+                        res = fn(*args, **kwargs)
+                        if failures > 0:
+                            logger.warning(f"The process tried: {failures} times")
+                        return res
+                    except BaseException:
+                        failures += 1
+                        if failures < times:
+                            time.sleep(delay_in_secs)
+                        else:
+                            raise
+
+            return wrapped
+
+        return will_retry_if_fails
 
     def login(self, **kwargs):
         self.auth.do_login(**kwargs)

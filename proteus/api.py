@@ -1,12 +1,17 @@
+import json
 import os
+from copy import deepcopy
+
 import requests
+from requests import Response, HTTPError, JSONDecodeError
+
 from proteus.config import Config
 
 
 class API:
     def __init__(self, auth, config: Config, logger):
         self.auth = auth
-        self.config = config or Config()
+        self.config = deepcopy(config or Config())
         self.host = config.api_host
         self.logger = logger
 
@@ -16,9 +21,9 @@ class API:
             "Content-Type": "application/json",
             **(headers or {}),
         }
-        url = f"{self.host}/{url.strip('/')}"
+        url = self.build_url(url)
         response = requests.get(url, headers=headers, params=query_args, stream=stream)
-        response.raise_for_status()
+        self.raise_for_status(response)
         return response
 
     def put(self, url, data, headers=None):
@@ -27,7 +32,7 @@ class API:
             "Content-Type": "application/json",
             **(headers or {}),
         }
-        url = f"{self.host}/{url.strip('/')}"
+        url = self.build_url(url)
         return requests.put(url, headers=headers, json=data)
 
     def post(self, url, data, headers=None):
@@ -36,7 +41,7 @@ class API:
             "Content-Type": "application/json",
             **(headers or {}),
         }
-        url = f"{self.host}/{url.strip('/')}"
+        url = self.build_url(url)
         return requests.post(url, headers=headers, json=data)
 
     def delete(self, url, headers={}, **query_args):
@@ -45,9 +50,9 @@ class API:
             "Content-Type": "application/json",
             **headers,
         }
-        url = f"{self.host}/{url.strip('/')}"
+        url = self.build_url(url)
         response = requests.delete(url, headers=headers, params=query_args)
-        response.raise_for_status()
+        self.raise_for_status(response)
         return response
 
     def _post_files(self, url, files, headers=None):
@@ -55,10 +60,10 @@ class API:
             "Authorization": f"Bearer {self.auth.access_token}",
             **(headers or {}),
         }
-        url = f"{self.host}/{url.strip('/')}"
+        url = self.build_url(url)
         response = requests.post(url, headers=headers, files=files)
         try:
-            response.raise_for_status()
+            self.raise_for_status(response)
         except Exception as error:
             self.logger.error(response.content)
             raise error
@@ -79,12 +84,6 @@ class API:
 
         r = self.download(url, stream=stream, timeout=timeout)
 
-        try:
-            r.raise_for_status()
-        except Exception as error:
-            self.logger.error("Response cannot raise status")
-            raise error
-
         os.makedirs(localpath, exist_ok=True)
         local = localpath
 
@@ -97,3 +96,33 @@ class API:
         self.logger.info("Download complete")
 
         return r.status_code
+
+    def build_url(self, url):
+        url = f"{self.host}/{url.strip('/')}"
+
+        args = []
+        if self.config.ignore_worker_status:
+            args.append("ignore_status=1")
+
+        if args:
+            args = "&".join(args)
+            if "?" in url:
+                args = "&" + args
+            else:
+                args = "?" + args
+
+        return url + args
+
+    def raise_for_status(self, response: Response):
+        try:
+            response.raise_for_status()
+        except HTTPError as http_error:
+            try:
+                error_detail = response.json()
+                if isinstance(error_detail, dict):
+                    http_error.args = (
+                        f"{http_error.args[0]}. Returned error " f"payload: {json.dumps(error_detail, indent=2)}",
+                    )
+            except JSONDecodeError:
+                pass
+            raise http_error
