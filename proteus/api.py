@@ -104,8 +104,8 @@ class API:
         if self.config.ignore_worker_status:
             args.append("ignore_status=1")
 
+        args = "&".join(args)
         if args:
-            args = "&".join(args)
             if "?" in url:
                 args = "&" + args
             else:

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class Config:
     client_secret: str = None
 
-    log_loc: str = "logs"
+    log_loc: str = None
     promt: bool = True
     auth_host: str = "https://auth.dev.origen.ai"
     api_host: str = "https://proteus-test.dev.origen.ai"
