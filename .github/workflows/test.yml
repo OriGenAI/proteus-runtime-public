@@ -2,11 +2,11 @@
 # checks if the version as been bumped and, if so, squash the changes into the branch
 # dev-release and push branch dev-release to OriGenAI/runtime-public#public
 
-name: Release & push to public repository
+name: Test
 on:
-  push:
+  pull_request:
     branches:
-      - dev-deploy
+      - dev
 
 jobs:
   build:
@@ -54,48 +54,3 @@ jobs:
           poetry install
           poetry run poe test
           rm -rf .env
-
-      - name: Squash changes and store into release
-        run: |
-          git config --local user.name $GITHUB_USERNAME
-          git config --local user.email $GITHUB_EMAIL
-          mkdir ./temp
-          mv .git/ ./temp/
-          cd ./temp
-          git checkout dev-release
-          mv .git/ ..
-          cd ..
-          rm -rf temp
-          git add .
-          git commit -am "update version ${{ env.proj_version }}"
-        env:
-          GITHUB_USERNAME: github-actions[bot]
-          GITHUB_EMAIL: github-actions[bot]@users.noreply.github.com
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: dev-release
-
-      - uses: actions/checkout@v3
-        with:
-          repository: OriGenAI/runtime-public
-          persist-credentials: true
-          ssh-key: ${{ secrets.PROTEUS_RUNTIME_PUBLIC_SSH_DEPLOYMENT_KEY }}
-          ref: dev
-
-      - name: Merge Upstream
-        uses: exions/merge-upstream@v1
-        with:
-          upstream: OriGenAI/runtime
-          upstream-branch: dev-release
-          branch: dev
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          ssh: true
-          repository: OriGenAI/runtime-public
-          branch: dev

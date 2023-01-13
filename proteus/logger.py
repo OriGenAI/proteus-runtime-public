@@ -3,6 +3,8 @@ import logging.config
 import logging.handlers
 import os
 
+from pathlib import Path
+
 
 def initialize_logger(log_loc=None):
     # Discover logging.ini path
@@ -16,6 +18,9 @@ def initialize_logger(log_loc=None):
     else:
         # Fallback to runtime logger
         logging_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), "logging.ini")
+
+    # Create logs folder. See logging.ini
+    Path(os.path.join(os.path.dirname(logging_path), "logs")).mkdir(parents=True, exist_ok=True)
 
     # Init logger
     logging.config.fileConfig(logging_path, disable_existing_loggers=False)

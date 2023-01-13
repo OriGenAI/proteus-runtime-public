@@ -1,6 +1,7 @@
-import pytest
 import jwt
+import pytest
 from requests.models import Response
+
 from proteus.config import Config
 
 
@@ -38,5 +39,5 @@ def mocked_api_get(mocker):
 def mocked_api_post(mocker):
     mock = mocker.patch("requests.post", return_value=Response())
     mock.return_value.status_code = 200
-    mock.return_value._content = b"Test content"
+    mock.return_value._content = b'{"file": {}}'
     return mock

@@ -15,3 +15,4 @@ class Config:
     client_id: str = "proteus-front"
     refresh_gap: int = 10  # Seconds
     ignore_worker_status: bool = False
+    upload_presigned: bool = True

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "proteus-runtime"
-version = "0.2.3"
+version = "0.2.4"
 description = ""
 authors = []
 packages = [
@@ -15,6 +15,8 @@ certifi = "^2022.12.07"
 setuptools = "^65.0.0"
 parglare = "^0.16.0"
 numpy = "^1.23.3"
+azure-storage-blob = "^12.14.1"
+multipart = "^0.2.4"
 
 [tool.poetry.dev-dependencies]
 python-dotenv = "^0.19.2"
