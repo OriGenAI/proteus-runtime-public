@@ -1,6 +1,6 @@
 # Triggered when a push is made to the branch dev-deploy, it runs tests on that branch
 # checks if the version as been bumped and, if so, squash the changes into the branch
-# dev-release and push branch dev-release to OriGenAI/runtime-public#public
+# dev-release and push branch dev-release to OriGenAI/proteus-runtime-public#public
 
 name: Release & push to public repository
 on:
@@ -80,7 +80,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          repository: OriGenAI/runtime-public
+          repository: OriGenAI/proteus-runtime-public
           persist-credentials: true
           ssh-key: ${{ secrets.PROTEUS_RUNTIME_PUBLIC_SSH_DEPLOYMENT_KEY }}
           ref: dev
@@ -88,7 +88,7 @@ jobs:
       - name: Merge Upstream
         uses: exions/merge-upstream@v1
         with:
-          upstream: OriGenAI/runtime
+          upstream: OriGenAI/proteus-runtime
           upstream-branch: dev-release
           branch: dev
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -97,5 +97,5 @@ jobs:
         uses: ad-m/github-push-action@master
         with:
           ssh: true
-          repository: OriGenAI/runtime-public
+          repository: OriGenAI/proteus-runtime-public
           branch: dev
