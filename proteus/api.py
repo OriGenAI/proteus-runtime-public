@@ -5,9 +5,8 @@ from urllib.parse import urlencode, quote_plus
 
 import requests
 from azure.storage.blob import BlobClient
-from requests import Response, HTTPError, JSONDecodeError
-
 from proteus.config import Config
+from requests import Response, HTTPError, JSONDecodeError
 
 
 class API:
@@ -92,7 +91,7 @@ class API:
         file = next(iter(files.values()))[1]
 
         # If the file is an stream, ensure it has been rewound
-        if hasattr("file", "seek"):
+        if hasattr(file, "seek"):
             file.seek(0)
             assert file.tell() == 0
         else:
