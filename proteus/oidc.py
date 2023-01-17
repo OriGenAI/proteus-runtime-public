@@ -121,18 +121,18 @@ class OIDC:
         }
         if self.client_secret is not None:
             login["client_secret"] = self.client_secret
-        try:
-            response = self.send_login_request(login)
-            credentials = response.json()
-            assert "access_token" in credentials
-            if self._when_login_callback is not None:
-                self._when_login_callback()
-            self._update_credentials(**credentials)
-            if auto_update is True:
-                self.prepare_refresh()
-            return True
-        except Exception as e:
-            print(e)
+
+        response = self.send_login_request(login)
+        self.proteus.api.raise_for_status(response)
+
+        credentials = response.json()
+        assert "access_token" in credentials
+        if self._when_login_callback is not None:
+            self._when_login_callback()
+        self._update_credentials(**credentials)
+        if auto_update is True:
+            self.prepare_refresh()
+        return True
 
     def do_worker_login(self, **terms):
         self.realm = self.realm
