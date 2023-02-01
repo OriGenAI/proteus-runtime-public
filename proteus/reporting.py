@@ -80,5 +80,5 @@ class Reporting:
         report["total"] = total
         data["report"] = report
         response = self.api.post(status_url, data)
-        response.raise_for_status()
+        self.api.raise_for_status(response)
         return response

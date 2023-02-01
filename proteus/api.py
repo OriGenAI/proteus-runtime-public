@@ -168,8 +168,8 @@ class API:
 
         return response
 
-    def post_file(self, url, filepath, content=None, modified=None):
-        headers = {}
+    def post_file(self, url, filepath, content=None, modified=None, headers=None):
+        headers = {} if not headers else dict(headers)
         if modified is not None:
             headers["x-last-modified"] = modified.isoformat()
         files = dict(file=(filepath, content))

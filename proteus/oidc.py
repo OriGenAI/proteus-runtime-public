@@ -109,7 +109,7 @@ class OIDC:
         if response.status_code == 401:
             # No need to be blunt
             return None
-        response.raise_for_status()
+        self.proteus.api.raise_for_status(response)
         return response
 
     def do_login(self, password=None, username=None, auto_update=True):
@@ -158,7 +158,7 @@ class OIDC:
             verify=certifi.where(),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        response.raise_for_status()
+        self.proteus.api.raise_for_status(response)
         return response
 
     def do_refresh(self):
