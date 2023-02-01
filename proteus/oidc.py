@@ -177,7 +177,7 @@ class OIDC:
             assert credentials.get("access_token") is not None
             self._update_credentials(**credentials)
         except Exception:
-            self.proteus.logger.error("Failed.")
+            self.proteus.logger.error("Failed to refresh token, re-loging againg")
             return self.do_login()
         finally:
             self._access_token_locked.release()

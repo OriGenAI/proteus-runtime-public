@@ -14,7 +14,7 @@ def assert_file_uploaded_to_blob_storage(blob_storage_mock, backend_file_info, f
     blob_storage_mock.from_blob_url.assert_called_with(backend_file_info.presigned_url)
     blob_client_mock = blob_storage_mock.from_blob_url.return_value
 
-    blob_client_mock.upload_blob.assert_called_with(file.content, overwrite=True)
+    blob_client_mock.commit_block_list.assert_called()
 
 
 @then("the system notifies the backend that the file is ready after the upload")

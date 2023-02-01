@@ -47,7 +47,11 @@ class Proteus:
                     try:
                         res = fn(*args, **kwargs)
                         if failures > 0:
-                            logger.warning(f"The process tried: {failures} times")
+                            logger.warning(
+                                f'Call to function "{fn.__name__}" was successful '
+                                f"after {failures} failed "
+                                f"attemp{'' if failures == 1 else 's' }"
+                            )
                         return res
                     except BaseException:
                         failures += 1

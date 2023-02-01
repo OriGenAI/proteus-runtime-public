@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "proteus-runtime"
-version = "0.2.8"
+version = "0.2.9"
 description = ""
 authors = []
 packages = [
@@ -40,6 +40,7 @@ PyJWT = "^2.4.0"
         cmd="""
             flake8 proteus
                 --max-line-length=120
+                --ignore=E203
         """
         help="Check code style using flake8"
     [tool.poe.tasks.black_check]

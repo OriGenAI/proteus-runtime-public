@@ -1,15 +1,20 @@
 import json
 import os
+import uuid
 from copy import deepcopy, copy
 from urllib.parse import urlencode, quote_plus
 
 import requests
-from azure.storage.blob import BlobClient
-from proteus.config import Config
+from azure.storage.blob import BlobClient, BlobBlock
 from requests import Response, HTTPError, JSONDecodeError
+
+from proteus.config import Config
 
 
 class API:
+
+    CONTENT_CHUNK_SIZE = 10 * 1024 * 1024
+
     def __init__(self, auth, config: Config, logger):
         self.auth = auth
         self.config = deepcopy(config or Config())
@@ -90,14 +95,37 @@ class API:
 
         file = next(iter(files.values()))[1]
 
-        # If the file is an stream, ensure it has been rewound
+        # If the file is a stream, ensure it has been rewound
         if hasattr(file, "seek"):
             file.seek(0)
             assert file.tell() == 0
         else:
             assert isinstance(file, (bytes, str))
 
-        BlobClient.from_blob_url(file_info["presigned_url"]["url"]).upload_blob(file, overwrite=True)
+        client = BlobClient.from_blob_url(file_info["presigned_url"]["url"])
+
+        block_list = []
+        block_ids = set()
+        pos = 0
+        while True:
+            if hasattr(file, "read"):
+                chunk = file.read(self.CONTENT_CHUNK_SIZE)
+            else:
+                chunk = file[pos : pos + self.CONTENT_CHUNK_SIZE]
+                pos += self.CONTENT_CHUNK_SIZE
+            if len(chunk) > 0:
+                block_id = str(uuid.uuid4())
+                while block_id in block_ids:
+                    block_id = str(uuid.uuid4())
+
+                client.stage_block(block_id=block_id, data=chunk)
+                block_list.append(BlobBlock(block_id=block_id))
+                block_ids.add(block_id)
+
+            if len(chunk) < self.CONTENT_CHUNK_SIZE:
+                break
+
+        client.commit_block_list(block_list)
 
         response = self.put(
             f'/api/v1/buckets/{file_info["presigned_url"]["bucket_uuid"]}/files/{file_info["uuid"]}',
