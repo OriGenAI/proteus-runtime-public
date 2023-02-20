@@ -12,56 +12,79 @@ from proteus.config import Config
 
 
 class API:
-
     CONTENT_CHUNK_SIZE = 10 * 1024 * 1024
 
-    def __init__(self, auth, config: Config, logger):
+    def __init__(self, proteus, auth, config: Config, logger):
         self.auth = auth
+        self.proteus = proteus
         self.config = deepcopy(config or Config())
         self.host = config.api_host
         self.logger = logger
 
-    def get(self, url, headers=None, stream=False, **query_args):
+    def get(self, url, headers=tuple(), stream=False, retry=None, retry_delay=None, timeout=True, **query_args):
+        return self.request(
+            "get",
+            url,
+            headers=headers,
+            params=query_args,
+            stream=stream,
+            retry=retry,
+            retry_delay=retry_delay,
+            timeout=timeout,
+        )
+
+    def put(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout=True):
+        return self.request(
+            "put", url, headers=headers, json=data, retry=retry, retry_delay=retry_delay, timeout=timeout
+        )
+
+    def post(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout=True):
+        return self.request(
+            "post", url, headers=headers, json=data, retry=retry, retry_delay=retry_delay, timeout=timeout
+        )
+
+    def delete(self, url, headers=tuple(), retry=None, retry_delay=None, timeout=True, **query_args):
+        return self.request(
+            "delete", url, headers=headers, params=query_args, retry=retry, retry_delay=retry_delay, timeout=timeout
+        )
+
+    def request(self, method, url, headers=tuple(), retry=None, retry_delay=None, timeout=True, **params):
+        url = self.build_url(url)
+
         headers = {
             "Authorization": f"Bearer {self.auth.access_token}",
             "Content-Type": "application/json",
-            **(headers or {}),
+            **dict(headers),
         }
-        url = self.build_url(url)
-        response = requests.get(url, headers=headers, params=query_args, stream=stream)
-        self.raise_for_status(response)
+
+        composed_params = {"headers": headers, "verify": self.config.ssl_verify}
+        composed_params.update(params)
+
+        if timeout:
+            if isinstance(timeout, bool):
+                timeout = self.config.default_timeout
+            # Set only connect timeout, not download timeout
+            composed_params["timeout"] = (timeout, None)
+
+        def _do_request():
+            res = requests.request(method, url, **composed_params)
+            self.raise_for_status(res)
+            return res
+
+        if retry is not None:
+            if isinstance(retry, bool):
+                retry = self.config.default_retry_times
+
+            if retry_delay is None:
+                retry_delay = self.config.default_retry_wait
+
+            response = self.proteus.may_insist_up_to(times=retry, delay_in_secs=retry_delay)(_do_request)()
+        else:
+            response = _do_request()
+
         return response
 
-    def put(self, url, data, headers=None):
-        headers = {
-            "Authorization": f"Bearer {self.auth.access_token}",
-            "Content-Type": "application/json",
-            **(headers or {}),
-        }
-        url = self.build_url(url)
-        return requests.put(url, headers=headers, json=data)
-
-    def post(self, url, data, headers=None):
-        headers = {
-            "Authorization": f"Bearer {self.auth.access_token}",
-            "Content-Type": "application/json",
-            **(headers or {}),
-        }
-        url = self.build_url(url)
-        return requests.post(url, headers=headers, json=data)
-
-    def delete(self, url, headers={}, **query_args):
-        headers = {
-            "Authorization": f"Bearer {self.auth.access_token}",
-            "Content-Type": "application/json",
-            **headers,
-        }
-        url = self.build_url(url)
-        response = requests.delete(url, headers=headers, params=query_args)
-        self.raise_for_status(response)
-        return response
-
-    def _post_files_presigned(self, url, files, headers=None):
+    def _post_files_presigned(self, url, files, headers=tuple()):
         if not self.config.upload_presigned:
             return None
 
@@ -76,7 +99,7 @@ class API:
             **(headers or {}),
         }
 
-        original_response = requests.post(url, headers=headers, files=chopped_files)
+        original_response = requests.post(url, headers=headers, files=chopped_files, verify=self.config.ssl_verify)
 
         # Pre-signed not supported
         if original_response.status_code == 501:
@@ -145,44 +168,36 @@ class API:
 
         return response
 
-    def _post_files(self, url, files, headers=None):
+    def _post_files(self, url, files, retry=None, retry_delay=None, headers=tuple()):
         # First, try a pre-signed download
         response = self._post_files_presigned(url, files)
         if response:
             return response
 
-        # Regular upload
-        headers = {
-            "Authorization": f"Bearer {self.auth.access_token}",
-            **(headers or {}),
-        }
-        url = self.build_url(url)
+        return self.request("post", url, headers=headers, files=files, retry=retry, retry_delay=retry_delay)
 
-        response = requests.post(url, headers=headers, files=files)
-
-        try:
-            self.raise_for_status(response)
-        except Exception as error:
-            self.logger.error(response.content)
-            raise error
-
-        return response
-
-    def post_file(self, url, filepath, content=None, modified=None, headers=None):
+    def post_file(self, url, filepath, content=None, modified=None, headers=tuple(), retry=None, retry_delay=None):
         headers = {} if not headers else dict(headers)
         if modified is not None:
             headers["x-last-modified"] = modified.isoformat()
         files = dict(file=(filepath, content))
 
-        return self._post_files(url, files, headers=headers)
+        return self._post_files(url, files, retry=retry, retry_delay=retry_delay, headers=headers)
 
-    def download(self, url, stream=False, timeout=None):
-        return self.get(url, stream=stream, timeout=timeout, headers={"content-type": "application/octet-stream"})
+    def download(self, url, stream=False, timeout=True, retry=None, retry_delay=None):
+        return self.get(
+            url,
+            stream=stream,
+            timeout=timeout,
+            headers={"content-type": "application/octet-stream"},
+            retry=retry,
+            retry_delay=retry_delay,
+        )
 
-    def store_download(self, url, localpath, localname, stream=False, timeout=60):
+    def store_download(self, url, localpath, localname, stream=False, timeout=60, retry=None, retry_delay=None):
         self.logger.info(f"Downloading {url} to {os.path.join(localpath)}")
 
-        r = self.download(url, stream=stream, timeout=timeout)
+        r = self.download(url, stream=stream, timeout=timeout, retry=retry, retry_delay=retry_delay)
 
         os.makedirs(localpath, exist_ok=True)
         local = localpath

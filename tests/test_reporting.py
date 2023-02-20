@@ -81,11 +81,6 @@ def message_is_on_output(caplog, logged_msg):
     assert logged_msg in caplog.messages
 
 
-@scenario("features/reporting.feature", "Send a report without api instance")
-def test_send_report_without_api():
-    "Send a report without api instance"
-
-
 @then("the mocked api is not called")
 def mocked_api_not_called(mocked_api_post):
     mocked_api_post.assert_not_called()

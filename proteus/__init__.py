@@ -7,6 +7,7 @@ from .config import Config
 from .logger import initialize_logger
 from .oidc import OIDC, is_worker_username
 from .reporting import Reporting
+from .vault import Vault
 
 
 class Proteus:
@@ -14,8 +15,9 @@ class Proteus:
         self.config = config or Config()
         self.logger = initialize_logger(self.config.log_loc)
         self.auth = OIDC(self.config, self)
-        self.api = API(self.auth, self.config, self.logger)
+        self.api = API(self, self.auth, self.config, self.logger)
         self.reporting = Reporting(self.logger, self.api)
+        self.vault = Vault(self)
 
     def runs_authentified(self, func):
         """Decorator that authentifies and keeps token updated during execution."""
@@ -36,8 +38,11 @@ class Proteus:
 
         return wrapper
 
-    def may_insist_up_to(self, times, delay_in_secs=0, logger=None):
+    def may_insist_up_to(self, times=None, delay_in_secs=None, logger=None):
         logger = logger or self.logger
+        delay_in_secs = delay_in_secs if delay_in_secs is not None else self.config.default_retry_wait
+        times = times if times is not None else self.config.default_retry_times
+        times = times or 1
 
         def will_retry_if_fails(fn):
             @wraps(fn)

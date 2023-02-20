@@ -29,7 +29,7 @@ def access_token_mock(mocker):
 
 @pytest.fixture
 def mocked_api_get(mocker):
-    mock = mocker.patch("requests.get", return_value=Response())
+    mock = mocker.patch("proteus.api.API.get", return_value=Response())
     mock.return_value.status_code = 200
     mock.return_value._content = b"Test content"
     return mock
@@ -37,7 +37,7 @@ def mocked_api_get(mocker):
 
 @pytest.fixture
 def mocked_api_post(mocker):
-    mock = mocker.patch("requests.post", return_value=Response())
+    mock = mocker.patch("proteus.api.API.post", return_value=Response())
     mock.return_value.status_code = 200
     mock.return_value._content = b'{"file": {}}'
     return mock

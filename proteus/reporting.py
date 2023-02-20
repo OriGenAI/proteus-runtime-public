@@ -1,9 +1,33 @@
+from functools import wraps
+
+
 class Reporting:
     """Unifies logging and reporting to status API"""
 
     def __init__(self, logger, api=None):
         self.logger = logger
         self.api = api
+
+    def ensure_failed_is_reported(self, fn):
+        @wraps(fn)
+        def _(*args, **kwargs):
+            try:
+                fn(*args, **kwargs)
+            except BaseException as error:
+                self.send(status="failed", message=str(error))
+                raise
+
+        return _
+
+    def ensure_finished_is_reported(self, fn):
+        @wraps(fn)
+        def _(*args, **kwargs):
+            fn(*args, **kwargs)
+            self.send(
+                "Begin configuration validation process",
+                status="completed",
+                progress=100,
+            )
 
     def send(
         self,
@@ -30,16 +54,16 @@ class Reporting:
             message,
             extra={"status": status, "progress": progress, "result": result},
         )
-        if self.api:
-            self._report(
-                self.api.auth.worker_uuid,
-                set_status=str(status),
-                message=message,
-                progress=progress,
-                result=result,
-                total=total,
-                number=number,
-            )
+
+        self._report(
+            self.api.auth.worker_uuid,
+            set_status=str(status),
+            message=message,
+            progress=progress,
+            result=result,
+            total=total,
+            number=number,
+        )
 
     def _report(
         self,
@@ -79,6 +103,6 @@ class Reporting:
         report["number"] = number
         report["total"] = total
         data["report"] = report
-        response = self.api.post(status_url, data)
+        response = self.api.post(status_url, data, retry=True)
         self.api.raise_for_status(response)
         return response

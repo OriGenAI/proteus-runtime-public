@@ -4,12 +4,6 @@ Feature: Generate a report
         When sending a report with message: reporting status
         Then the mocked api is called once
         And the message is in the standard output
-    
-    Scenario: Send a report without api instance
-        Given a reporting instance without api reference
-        When sending a report with message: reporting status
-        Then the mocked api is not called
-        And the message is in the standard output
 
     Scenario: Log info message
         When I log the messsage: logging some info
