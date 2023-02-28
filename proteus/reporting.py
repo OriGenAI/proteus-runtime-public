@@ -12,7 +12,11 @@ class Reporting:
         @wraps(fn)
         def _(*args, **kwargs):
             try:
-                fn(*args, **kwargs)
+                return fn(*args, **kwargs)
+            except SystemExit as error:
+                if error.code != 0:
+                    self.send(status="failed", message="Exit status different than 0")
+                raise
             except BaseException as error:
                 self.send(status="failed", message=str(error))
                 raise
