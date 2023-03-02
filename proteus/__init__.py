@@ -7,6 +7,7 @@ from .config import Config
 from .logger import initialize_logger
 from .oidc import OIDC, is_worker_username
 from .reporting import Reporting
+from .runs import Runs
 from .vault import Vault
 
 
@@ -17,6 +18,7 @@ class Proteus:
         self.auth = OIDC(self.config, self)
         self.api = API(self, self.auth, self.config, self.logger)
         self.reporting = Reporting(self.logger, self.api)
+        self.runs = Runs(self)
         self.vault = Vault(self)
 
     def runs_authentified(self, func):

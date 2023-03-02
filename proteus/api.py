@@ -33,6 +33,11 @@ class API:
             timeout=timeout,
         )
 
+    def patch(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout=True):
+        return self.request(
+            "patch", url, headers=headers, json=data, retry=retry, retry_delay=retry_delay, timeout=timeout
+        )
+
     def put(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout=True):
         return self.request(
             "put", url, headers=headers, json=data, retry=retry, retry_delay=retry_delay, timeout=timeout
@@ -213,7 +218,8 @@ class API:
         return r.status_code
 
     def build_url(self, url, **params):
-        url = f"{self.host}/{url.strip('/')}"
+        path = url.strip("/") if not url.startswith("api/v2/") else url
+        url = f"{self.host}/{path}"
 
         # FIXME: This should be propagated up-down from the corresponding caller
         if self.config.ignore_worker_status:
