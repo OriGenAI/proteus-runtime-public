@@ -9,6 +9,7 @@ from .oidc import OIDC, is_worker_username
 from .reporting import Reporting
 from .runs import Runs
 from .vault import Vault
+from .bucket import Bucket
 
 
 class Proteus:
@@ -20,6 +21,7 @@ class Proteus:
         self.reporting = Reporting(self.logger, self.api)
         self.runs = Runs(self)
         self.vault = Vault(self)
+        self.bucket = Bucket(self.api, self.logger)
 
     def runs_authentified(self, func):
         """Decorator that authentifies and keeps token updated during execution."""
