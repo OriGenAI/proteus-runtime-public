@@ -11,9 +11,11 @@ def mocked_auth(mocker):
     auth_mock = mocker.patch("proteus.oidc.OIDC.access_token")
     auth_mock.return_value = True
 
+
 @scenario("features/bucket.feature", "Download bucket")
 def test_download(mocked_auth):
     pass
+
 
 @given("an api mock", target_fixture="updated_mocked_api_get")
 def updated_mocked_api_get(mocked_api_get):

@@ -24,11 +24,16 @@ def initialize_logger(log_loc=None):
         # Fallback to runtime logger
         logging_path = FALLBACK_LOGGING_PATH
 
-    # Create logs folder. See logging.ini
-    Path(os.path.join(os.path.dirname(logging_path), "logs")).mkdir(parents=True, exist_ok=True)
-
-    # Init logger
-    logging.config.fileConfig(logging_path, disable_existing_loggers=False)
+    try:
+        # Create logs folder. See logging.ini
+        Path(os.path.join(os.path.dirname(logging_path), "logs")).mkdir(parents=True, exist_ok=True)
+        # Init logger
+        logging.config.fileConfig(logging_path, disable_existing_loggers=False)
+    except PermissionError:
+        print(
+            f"There are no permissions to create log files in {os.path.dirname(logging_path)}"
+            ", will continue without storing logs on the machine"
+        )
 
     # Disable known noisy loggers
     azure_logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
