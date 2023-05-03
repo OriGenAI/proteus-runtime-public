@@ -1,6 +1,8 @@
 import os
+
 import pytest
 from pytest_bdd import scenario, given, when, then
+
 from proteus import Proteus
 
 proteus = Proteus()
@@ -36,7 +38,7 @@ def target_folder():
 
 @when("I download")
 def download_bucket(bucket_uuid, target_folder, updated_mocked_api_get):
-    list(proteus.bucket.download(bucket_uuid, target_folder, workers=1))
+    list(proteus.bucket.download(bucket_uuid, target_folder, workers=1, via="api_files"))
 
 
 @then("there are logged messages")

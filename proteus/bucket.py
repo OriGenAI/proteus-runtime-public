@@ -1,6 +1,8 @@
 import os
 import shutil
+import subprocess
 from multiprocessing.dummy import Pool
+from threading import Thread
 
 from tqdm import tqdm
 
@@ -22,9 +24,9 @@ class Bucket:
                 break
             data = self.api.get(next_, retry=True).json()
 
-    def _each_file_bucket(self, bucket_uuid, each_file_fn, workers=3, **search):
+    def _each_file_bucket(self, bucket_uuid, each_file_fn=lambda x: x, workers=3, **search):
         assert self.api.auth.access_token is not None
-        response = self.api.get(f"/api/v1/buckets/{bucket_uuid}/files", per_page=10, **search)
+        response = self.api.get(f"/api/v1/buckets/{bucket_uuid}/files", per_page=1000, **search)
         total = response.json().get("total")
 
         for res in self.each_item_parallel(
@@ -39,7 +41,7 @@ class Bucket:
             for res in pool.imap(each_item_fn, items):
                 if progress:
                     progress.update(1)
-                    if res:
+                    if isinstance(res, str):
                         progress.set_description(res)
                 yield res
 
@@ -90,7 +92,70 @@ class Bucket:
 
         return do_download
 
-    def download(self, bucket_uuid, target_folder, workers=8, replace=False, **search):
+    def get_bucket_info(self, bucket_uuid):
+        response = self.api.get(f"/api/v1/buckets/{bucket_uuid}")
+        return response.json()
+
+    def download_via_azcopy(self, bucket_uuid, target_folder, workers=8, replace=False, **search):
+        bucket_info = self.get_bucket_info(bucket_uuid)
+
+        files = []
+
+        target_folder = os.path.join(os.getcwd(), target_folder)
+        target_folder_tmp = os.path.join(target_folder, "tmp")
+
+        file_metadata_downloader_error = None
+
+        def file_metadata_downloader():
+            try:
+                self.logger.info("Obtaining files metadata")
+                for file in self._each_file_bucket(bucket_uuid, workers=workers, **search):
+                    if file["ready"]:
+                        files.append(file)
+            except BaseException as e:
+                nonlocal file_metadata_downloader_error
+                file_metadata_downloader_error = e
+
+        metadata_downloader_thread = Thread(target=file_metadata_downloader, daemon=True)
+
+        os.makedirs(target_folder_tmp, exist_ok=True)
+        try:
+            self.logger.info("Downloading files")
+            az_copy_process = subprocess.Popen(
+                ["azcopy", "copy", bucket_info["bucket"]["presigned_url"]["url"], target_folder_tmp, "--recursive"],
+                cwd=target_folder_tmp,
+            )
+            metadata_downloader_thread.run()
+            az_copy_process.wait()
+            try:
+                metadata_downloader_thread.join()
+            except BaseException:
+                pass
+
+            if file_metadata_downloader_error:
+                raise file_metadata_downloader_error
+
+            for file in files:
+                src_file_path = os.path.join(target_folder_tmp, bucket_uuid, file["uuid"], file["filepath"])
+                dst_file_dir = os.path.join(target_folder, os.path.dirname(file["filepath"]))
+
+                dst_file_path = os.path.join(target_folder, file["filepath"])
+                os.makedirs(dst_file_dir, exist_ok=True)
+                shutil.move(src_file_path, dst_file_path)
+                yield dst_file_path
+        finally:
+            shutil.rmtree(target_folder_tmp)
+
+    def download(self, bucket_uuid, target_folder, workers=32, replace=False, via="azcopy", **search):
+        if via not in ("azcopy", "api_files"):
+            raise RuntimeError('"via" only accepts "azcopy" or "api_files"')
+
+        for file in getattr(self, f"download_via_{via}")(
+            bucket_uuid, target_folder, workers=workers, replace=replace, **search
+        ):
+            yield file
+
+    def download_via_api_files(self, bucket_uuid, target_folder, workers=8, replace=False, **search):
         replacement = "Previous files will be overwritten" if replace else "Existing files will be kept."
         self.logger.info(f"This process will use {workers} simultaneous threads. {replacement}")
         do_download = self.will_do_file_download(target_folder, force_replace=replace)
