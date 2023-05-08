@@ -1,7 +1,9 @@
 import json
 import os
+import subprocess
 import uuid
 from copy import deepcopy, copy
+from pathlib import Path
 from urllib.parse import urlencode, quote_plus
 
 import requests
@@ -123,37 +125,42 @@ class API:
 
         file = next(iter(files.values()))[1]
 
-        # If the file is a stream, ensure it has been rewound
-        if hasattr(file, "seek"):
-            file.seek(0)
-            assert file.tell() == 0
+        if isinstance(file, Path):  # if istype path
+            file_path = str(file.absolute())
+            subprocess.Popen(["azcopy", "copy", file_path, file_info["presigned_url"]["url"]]).wait()
+
         else:
-            assert isinstance(file, (bytes, str))
-
-        client = BlobClient.from_blob_url(file_info["presigned_url"]["url"])
-
-        block_list = []
-        block_ids = set()
-        pos = 0
-        while True:
-            if hasattr(file, "read"):
-                chunk = file.read(self.CONTENT_CHUNK_SIZE)
+            # If the file is a stream, ensure it has been rewound
+            if hasattr(file, "seek"):
+                file.seek(0)
+                assert file.tell() == 0
             else:
-                chunk = file[pos : pos + self.CONTENT_CHUNK_SIZE]
-                pos += self.CONTENT_CHUNK_SIZE
-            if len(chunk) > 0:
-                block_id = str(uuid.uuid4())
-                while block_id in block_ids:
+                assert isinstance(file, (bytes, str))
+
+            client = BlobClient.from_blob_url(file_info["presigned_url"]["url"])
+
+            block_list = []
+            block_ids = set()
+            pos = 0
+            while True:
+                if hasattr(file, "read"):
+                    chunk = file.read(self.CONTENT_CHUNK_SIZE)
+                else:
+                    chunk = file[pos : pos + self.CONTENT_CHUNK_SIZE]
+                    pos += self.CONTENT_CHUNK_SIZE
+                if len(chunk) > 0:
                     block_id = str(uuid.uuid4())
+                    while block_id in block_ids:
+                        block_id = str(uuid.uuid4())
 
-                client.stage_block(block_id=block_id, data=chunk)
-                block_list.append(BlobBlock(block_id=block_id))
-                block_ids.add(block_id)
+                    client.stage_block(block_id=block_id, data=chunk)
+                    block_list.append(BlobBlock(block_id=block_id))
+                    block_ids.add(block_id)
 
-            if len(chunk) < self.CONTENT_CHUNK_SIZE:
-                break
+                if len(chunk) < self.CONTENT_CHUNK_SIZE:
+                    break
 
-        client.commit_block_list(block_list)
+            client.commit_block_list(block_list)
 
         response = self.put(
             f'/api/v1/buckets/{file_info["presigned_url"]["bucket_uuid"]}/files/{file_info["uuid"]}',
