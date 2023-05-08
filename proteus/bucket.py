@@ -118,15 +118,19 @@ class Bucket:
 
         metadata_downloader_thread = Thread(target=file_metadata_downloader, daemon=True)
 
-        os.makedirs(target_folder_tmp, exist_ok=True)
+        target_folder_tmp_exists = os.path.exists(target_folder_tmp) and os.path.isdir(target_folder_tmp)
+
+        if not target_folder_tmp_exists:
+            os.makedirs(target_folder_tmp, exist_ok=True)
         try:
             self.logger.info("Downloading files")
-            az_copy_process = subprocess.Popen(
-                ["azcopy", "copy", bucket_info["bucket"]["presigned_url"]["url"], target_folder_tmp, "--recursive"],
-                cwd=target_folder_tmp,
+            az_copy_process = self._download_via_azcopy_process(
+                target_folder_tmp, bucket_info["bucket"]["presigned_url"]["url"]
             )
+
             metadata_downloader_thread.run()
             az_copy_process.wait()
+
             try:
                 metadata_downloader_thread.join()
             except BaseException:
@@ -141,10 +145,19 @@ class Bucket:
 
                 dst_file_path = os.path.join(target_folder, file["filepath"])
                 os.makedirs(dst_file_dir, exist_ok=True)
-                shutil.move(src_file_path, dst_file_path)
+                if not target_folder_tmp_exists:
+                    shutil.move(src_file_path, dst_file_path)
+                else:
+                    shutil.copy(src_file_path, dst_file_path)
                 yield dst_file_path
         finally:
-            shutil.rmtree(target_folder_tmp)
+            if not target_folder_tmp_exists:
+                shutil.rmtree(target_folder_tmp)
+
+    def _download_via_azcopy_process(self, target_folder_tmp, target):
+        return subprocess.Popen(
+            ["azcopy", "copy", target, target_folder_tmp, "--recursive"],
+        )
 
     def download(self, bucket_uuid, target_folder, workers=32, replace=False, via="azcopy", **search):
         if via not in ("azcopy", "api_files"):
