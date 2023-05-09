@@ -14,7 +14,7 @@ grammar_str = (
     + r"""
 terminals
 number: /\-?\d+(\.\d+)?/;
-array: /\$[a-zA-Z_][a-zA-Z0-9_]*/;
+array: /\$?\$[a-zA-Z_][a-zA-Z0-9_]*/;
 """  # noqa: W503
 )
 

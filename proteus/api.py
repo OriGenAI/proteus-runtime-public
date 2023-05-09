@@ -128,7 +128,6 @@ class API:
         if isinstance(file, Path):  # if istype path
             file_path = str(file.absolute())
             subprocess.Popen(["azcopy", "copy", file_path, file_info["presigned_url"]["url"]]).wait()
-
         else:
             # If the file is a stream, ensure it has been rewound
             if hasattr(file, "seek"):

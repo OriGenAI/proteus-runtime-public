@@ -4,8 +4,9 @@ import math
 
 
 def _get(ref, ctx):
-    if re.match(r"\$[a-zA-Z_]\w*", str(ref)):
-        return ctx.get(ref[1:])
+    result = re.search(r"\$?\$([a-zA-Z_]\w*)", str(ref))
+    if result:
+        return ctx.get(result.group(1))
     elif re.match(r"\-?\d+(\.\d+)?", str(ref)):
         return ref
     else:
