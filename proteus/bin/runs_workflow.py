@@ -5,7 +5,8 @@ password = "<password>"
 
 proteus = Proteus(
     Config(
-        api_host="https://proteus-azure.dev.origen.ai",
+        api_host="http://localhost:5000",
+        api_host_v2="http://localhost:8000",
         username=username,
         password=password,
     )
@@ -97,4 +98,4 @@ def runs_workflow():
 
 
 if __name__ == "__main__":
-    runs_workflow(user=username, password=password)
+    runs_workflow()

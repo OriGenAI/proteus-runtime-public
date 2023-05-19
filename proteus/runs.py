@@ -14,9 +14,10 @@ class Runs:
     def get_runs(self) -> Response:
         return self.proteus.api.get(self.runs_path)
 
-    def create_run(self, run_type: str) -> Response:
+    def create_run(self, run_id: str, run_type: str) -> Response:
+        path = join(self.runs_path, run_id)
         payload = {"type": run_type}
-        return self.proteus.api.post(self.runs_path, payload)
+        return self.proteus.api.post(path, payload)
 
     def get_run(self, run_id: str) -> Response:
         path = join(self.runs_path, run_id)

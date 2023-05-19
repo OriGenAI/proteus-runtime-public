@@ -21,6 +21,7 @@ class API:
         self.proteus = proteus
         self.config = deepcopy(config or Config())
         self.host = config.api_host
+        self.host_v2 = config.api_host_v2
         self.logger = logger
 
     def get(self, url, headers=tuple(), stream=False, retry=None, retry_delay=None, timeout=True, **query_args):
@@ -125,7 +126,7 @@ class API:
 
         file = next(iter(files.values()))[1]
 
-        if isinstance(file, Path):  # if istype path
+        if isinstance(file, Path):  # Path is needed, because a string will be the BLOB of the file
             file_path = str(file.absolute())
             subprocess.Popen(["azcopy", "copy", file_path, file_info["presigned_url"]["url"]]).wait()
         else:
@@ -225,7 +226,8 @@ class API:
 
     def build_url(self, url, **params):
         path = url.strip("/") if not url.startswith("api/v2/") else url
-        url = f"{self.host}/{path}"
+        host = self.host if not (self.host_v2 and url.startswith("api/v2/")) else self.host_v2
+        url = f"{host}/{path}"
 
         # FIXME: This should be propagated up-down from the corresponding caller
         if self.config.ignore_worker_status:

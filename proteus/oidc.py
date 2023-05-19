@@ -121,7 +121,6 @@ class OIDC:
         }
         if self.client_secret is not None:
             login["client_secret"] = self.client_secret
-
         response = self.send_login_request(login)
         self.proteus.api.raise_for_status(response)
 
@@ -204,6 +203,8 @@ class OIDC:
 
     @property
     def worker_uuid(self):
+        if self.config.worker_uuid:
+            return self.config.worker_uuid
         if self.am_i_robot:
             username = self.access_token_parsed.get("preferred_username")
             robot_match = WORKER_USERNAME_RE.match(username)

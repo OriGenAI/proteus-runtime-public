@@ -1,14 +1,16 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
 class Config:
-    client_secret: str = None
+    client_secret: Optional[str] = None
 
-    log_loc: str = None
+    log_loc: Optional[str] = None
     promt: bool = True
     auth_host: str = "https://auth.dev.origen.ai"
     api_host: str = "https://proteus-test.dev.origen.ai"
+    api_host_v2: Optional[str] = None
     vault_host: str = "https://vault.dev.origen.ai"
     username: str = "user-not-configured"
     password: str = "password-not-configured"
@@ -21,3 +23,4 @@ class Config:
     default_retry_times: int = 5
     default_retry_wait: float = 0.5  # s
     default_timeout = 30  # s
+    worker_uuid: Optional[str] = None
