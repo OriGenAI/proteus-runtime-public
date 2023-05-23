@@ -23,6 +23,10 @@ class Runs:
         path = join(self.runs_path, run_id)
         return self.proteus.api.get(path)
 
+    def delete_run(self, run_id: str) -> Response:
+        path = join(self.runs_path, run_id)
+        return self.proteus.api.delete(path)
+
     def get_series_list(self, run_id: str) -> Response:
         path = self.series_path.format(run_id=run_id)
         return self.proteus.api.get(path)

@@ -98,4 +98,4 @@ def runs_workflow():
 
 
 if __name__ == "__main__":
-    runs_workflow()
+    runs_workflow(user=username, password=password)
