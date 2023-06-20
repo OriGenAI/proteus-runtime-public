@@ -3,13 +3,13 @@ import time
 from functools import wraps
 
 from .api import API
+from .bucket import Bucket
 from .config import Config
 from .logger import initialize_logger
 from .oidc import OIDC, is_worker_username
 from .reporting import Reporting
 from .runs import Runs
 from .vault import Vault
-from .bucket import Bucket
 
 
 class Proteus:
@@ -23,22 +23,40 @@ class Proteus:
         self.vault = Vault(self)
         self.bucket = Bucket(self.api, self.logger)
 
-    def runs_authentified(self, func):
+    def runs_authentified(self, func=None, user=None, password=None):
         """Decorator that authentifies and keeps token updated during execution."""
 
-        @wraps(func)
-        def wrapper(user, password, *args, **kwargs):
-            try:
-                terms = dict(username=user, password=password, auto_update=True)
-                is_worker = is_worker_username(user)
-                authentified = self.auth.do_worker_login(**terms) if is_worker else self.auth.do_login(**terms)
+        class RunsAuthentifiedContextManager:
+            def __init__(self, runtime: Proteus, ctx_user, ctx_password):
+                self.runtime = runtime
+                self.ctx_user = ctx_user
+                self.ctx_password = ctx_password
+
+            def __enter__(self):
+                terms = dict(username=self.ctx_user, password=self.ctx_password, auto_update=True)
+                is_worker = is_worker_username(self.ctx_user)
+                authentified = (
+                    self.runtime.auth.do_worker_login(**terms) if is_worker else self.runtime.auth.do_login(**terms)
+                )
                 if not authentified:
-                    self.logger.error("Authentication failure, exiting")
+                    self.runtime.logger.error("Authentication failure, exiting")
                     sys.exit(1)
-                self.logger.info(f"Welcome, {self.auth.who}")
-                return func(*args, **kwargs)
-            finally:
-                self.auth.stop()
+
+                self.runtime.logger.info(f"Welcome, {self.runtime.auth.who}")
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                self.runtime.auth.stop()
+
+        if not func:
+            return RunsAuthentifiedContextManager(runtime=self, ctx_user=user, ctx_password=password)
+
+        wrapped_user = user
+        wrapped_password = password
+
+        @wraps(func)
+        def wrapper(user=wrapped_user, password=wrapped_password, *fn_args, **fn_kwargs):
+            with RunsAuthentifiedContextManager(runtime=self, ctx_user=user, ctx_password=password):
+                return func(*fn_args, **fn_kwargs)
 
         return wrapper
 
