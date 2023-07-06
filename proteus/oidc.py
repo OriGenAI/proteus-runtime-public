@@ -1,7 +1,6 @@
 import base64
 import json
 import re
-from copy import deepcopy
 from threading import Timer, Lock
 
 import certifi
@@ -24,18 +23,16 @@ def is_worker_username(username):
 class OIDC:
     def __init__(
         self,
-        config,
         proteus,
     ):
-        host = config.auth_host
+        host = proteus.config.auth_host
 
-        self.config = deepcopy(config)
         self.proteus = proteus
-        self.username = config.username
+        self.username = proteus.config.username
         self.host = host if host.endswith("/auth") else host + "/auth"
-        self.realm = config.realm
-        self.client_id = config.client_id
-        self.client_secret = config.client_secret
+        self.realm = proteus.config.realm
+        self.client_id = proteus.config.client_id
+        self.client_secret = proteus.config.client_secret
         self._access_token_locked = Lock()
         self._last_res = None
         self._refresh_timer = None
@@ -63,7 +60,6 @@ class OIDC:
 
     @property
     def access_token(self):
-        self.do_refresh()
         self._access_token_locked.acquire()
         result = self._access_token
         self._access_token_locked.release()
@@ -116,7 +112,7 @@ class OIDC:
         login = {
             "grant_type": "password",
             "username": self.username if username is None else username,
-            "password": password or self.config.password,
+            "password": password or self.proteus.config.password,
             "client_id": self.client_id,
         }
         if self.client_secret is not None:
@@ -146,7 +142,7 @@ class OIDC:
         def perform_refresh():
             self.do_refresh()
 
-        self._refresh_timer = RepeatTimer(self.expires_in - self.config.refresh_gap, perform_refresh)
+        self._refresh_timer = RepeatTimer(self.expires_in - self.proteus.config.refresh_gap, perform_refresh)
         self._refresh_timer.start()
 
     # @may_insist_up_to(5, delay_in_secs=1)
@@ -203,8 +199,8 @@ class OIDC:
 
     @property
     def worker_uuid(self):
-        if self.config.worker_uuid:
-            return self.config.worker_uuid
+        if self.proteus.config.worker_uuid:
+            return self.proteus.config.worker_uuid
         if self.am_i_robot:
             username = self.access_token_parsed.get("preferred_username")
             robot_match = WORKER_USERNAME_RE.match(username)

@@ -16,12 +16,12 @@ class Proteus:
     def __init__(self, config: Config = None) -> None:
         self.config = config or Config()
         self.logger = initialize_logger(self.config.log_loc)
-        self.auth = OIDC(self.config, self)
-        self.api = API(self, self.auth, self.config, self.logger)
-        self.reporting = Reporting(self.logger, self.api)
+        self.auth = OIDC(self)
+        self.api = API(self)
+        self.reporting = Reporting(self)
         self.runs = Runs(self)
         self.vault = Vault(self)
-        self.bucket = Bucket(self.api, self.logger)
+        self.bucket = Bucket(self)
 
     def runs_authentified(self, func=None, user=None, password=None):
         """Decorator that authentifies and keeps token updated during execution."""

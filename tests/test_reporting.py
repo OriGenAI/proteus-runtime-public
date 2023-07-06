@@ -9,7 +9,7 @@ proteus = Proteus()
 
 @given("a reporting instance", target_fixture="reporting")
 def reporting(session):
-    return Reporting(proteus.logger, proteus.api)
+    return Reporting(proteus)
 
 
 @given(

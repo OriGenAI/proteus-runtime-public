@@ -1,16 +1,19 @@
 import os
 import shutil
 import subprocess
+import tempfile
+from copy import deepcopy
 from multiprocessing.dummy import Pool
 from threading import Thread
 
 from tqdm import tqdm
 
+AZ_COPY_PRESENT = shutil.which("azcopy") is not None
+
 
 class Bucket:
-    def __init__(self, api, logger):
-        self.api = api
-        self.logger = logger
+    def __init__(self, proteus):
+        self.proteus = proteus
 
     def iterate_pagination(self, response, current=0):
         assert response.status_code == 200
@@ -22,11 +25,11 @@ class Bucket:
             next_ = data.get("next")
             if next_ is None:
                 break
-            data = self.api.get(next_, retry=True).json()
+            data = self.proteus.api.get(next_, retry=True).json()
 
     def _each_file_bucket(self, bucket_uuid, each_file_fn=lambda x: x, workers=3, **search):
-        assert self.api.auth.access_token is not None
-        response = self.api.get(f"/api/v1/buckets/{bucket_uuid}/files", per_page=1000, **search)
+        assert self.proteus.auth.access_token is not None
+        response = self.proteus.api.get(f"/api/v1/buckets/{bucket_uuid}/files", per_page=1000, **search)
         total = response.json().get("total")
 
         for res in self.each_item_parallel(
@@ -37,13 +40,16 @@ class Bucket:
     def each_item_parallel(self, total, items, each_item_fn, progress=False, workers=3):
         if progress:
             progress = tqdm(total=total)
+
         with Pool(processes=workers) as pool:
-            for res in pool.imap(each_item_fn, items):
+            items = pool.imap(each_item_fn, items) if workers > 1 else items
+
+            for res in items:
                 if progress:
                     progress.update(1)
                     if isinstance(res, str):
                         progress.set_description(res)
-                yield res
+                yield res if workers > 1 else each_item_fn(res)
 
     def store_stream_in(self, stream, filepath, progress=None, chunk_size=1024):
         folder_path = os.path.join(*filepath.split("/")[:-1])
@@ -79,21 +85,21 @@ class Bucket:
             url, path, size, ready = item["url"], item["filepath"], item["size"], item["ready"]
 
             if not ready:
-                self.logger.warning(f"File {path} is not ready, skipping")
+                self.proteus.logger.warning(f"File {path} is not ready, skipping")
                 return
 
             target_filepath = os.path.normpath(os.path.join(target, path))
             if not force_replace and self.is_file_already_present(target_filepath, size=size):
                 return False
 
-            download = self.api.download(url, stream=True, retry=True)
+            download = self.proteus.api.download(url, stream=True, retry=True)
             self.store_stream_in(download, target_filepath, chunk_size=chunk_size)
             return path
 
         return do_download
 
     def get_bucket_info(self, bucket_uuid):
-        response = self.api.get(f"/api/v1/buckets/{bucket_uuid}")
+        response = self.proteus.api.get(f"/api/v1/buckets/{bucket_uuid}")
         return response.json()
 
     def download_via_azcopy(self, bucket_uuid, target_folder, workers=8, replace=False, **search):
@@ -108,7 +114,7 @@ class Bucket:
 
         def file_metadata_downloader():
             try:
-                self.logger.info("Obtaining files metadata")
+                self.proteus.logger.info("Obtaining files metadata")
                 for file in self._each_file_bucket(bucket_uuid, workers=workers, **search):
                     if file["ready"]:
                         files.append(file)
@@ -123,13 +129,13 @@ class Bucket:
         if not target_folder_tmp_exists:
             os.makedirs(target_folder_tmp, exist_ok=True)
         try:
-            self.logger.info("Downloading files")
-            az_copy_process = self._download_via_azcopy_process(
-                target_folder_tmp, bucket_info["bucket"]["presigned_url"]["url"]
-            )
-
+            self.proteus.logger.info("Downloading files")
             metadata_downloader_thread.run()
-            az_copy_process.wait()
+
+            try:
+                self.run_azcopy("copy", bucket_info["bucket"]["presigned_url"]["url"], target_folder_tmp, "--recursive")
+            except AzCopyError as e:
+                raise RuntimeError(f'Could not download bucket {bucket_uuid} via azcopy: \n{e.out or ""}\n{e.err}')
 
             try:
                 metadata_downloader_thread.join()
@@ -163,6 +169,12 @@ class Bucket:
         if via not in ("azcopy", "api_files"):
             raise RuntimeError('"via" only accepts "azcopy" or "api_files"')
 
+        if via == "azcopy" and not AZ_COPY_PRESENT:
+            self.proteus.logger.warning(
+                "azcopy download is not possible because the command is not installed, resorting to "
+                "the api_files method"
+            )
+
         for file in getattr(self, f"download_via_{via}")(
             bucket_uuid, target_folder, workers=workers, replace=replace, **search
         ):
@@ -170,8 +182,35 @@ class Bucket:
 
     def download_via_api_files(self, bucket_uuid, target_folder, workers=8, replace=False, **search):
         replacement = "Previous files will be overwritten" if replace else "Existing files will be kept."
-        self.logger.info(f"This process will use {workers} simultaneous threads. {replacement}")
+        self.proteus.logger.info(f"This process will use {workers} simultaneous threads. {replacement}")
         do_download = self.will_do_file_download(target_folder, force_replace=replace)
 
         for file in self._each_file_bucket(bucket_uuid, do_download, workers=workers, **search):
             yield file
+
+    # os.environ.copy may be slow
+    AZCOPY_DEFAULT_ENVIRON = os.environ.copy()
+
+    @classmethod
+    def run_azcopy(cls, *args):
+
+        command = ["azcopy"]
+        command.extend(args)
+
+        with tempfile.TemporaryDirectory(prefix="proteus-azcopy-") as az_logs_dir:
+            azcopy_env = deepcopy(cls.AZCOPY_DEFAULT_ENVIRON)
+            azcopy_env["AZCOPY_LOG_LOCATION"] = os.path.join(az_logs_dir, "logs")
+            azcopy_env["AZCOPY_JOB_PLAN_LOCATION"] = os.path.join(az_logs_dir, "plans")
+            azcopy_cmd = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE, env=azcopy_env)
+            azcopy_cmd.wait()
+            if azcopy_cmd.returncode != 0:
+                out, err = azcopy_cmd.communicate()
+                raise AzCopyError(err, out, command)
+
+
+class AzCopyError(RuntimeError):
+    def __init__(self, err, out, command):
+        super().__init__("AzCopy command failed")
+        self.err = err and err.decode()
+        self.out = out and out.decode()
+        self.command = command

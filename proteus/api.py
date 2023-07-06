@@ -1,8 +1,7 @@
 import json
 import os
-import subprocess
 import uuid
-from copy import deepcopy, copy
+from copy import copy
 from pathlib import Path
 from urllib.parse import urlencode, quote_plus
 
@@ -10,19 +9,16 @@ import requests
 from azure.storage.blob import BlobClient, BlobBlock
 from requests import Response, HTTPError, JSONDecodeError
 
-from proteus.config import Config
+from proteus.bucket import AZ_COPY_PRESENT, AzCopyError
 
 
 class API:
     CONTENT_CHUNK_SIZE = 10 * 1024 * 1024
 
-    def __init__(self, proteus, auth, config: Config, logger):
-        self.auth = auth
+    def __init__(self, proteus):
         self.proteus = proteus
-        self.config = deepcopy(config or Config())
-        self.host = config.api_host
-        self.host_v2 = config.api_host_v2
-        self.logger = logger
+        self.host = proteus.config.api_host
+        self.host_v2 = proteus.config.api_host_v2
 
     def get(self, url, headers=tuple(), stream=False, retry=None, retry_delay=None, timeout=True, **query_args):
         return self.request(
@@ -60,17 +56,17 @@ class API:
         url = self.build_url(url)
 
         headers = {
-            "Authorization": f"Bearer {self.auth.access_token}",
+            "Authorization": f"Bearer {self.proteus.auth.access_token}",
             "Content-Type": "application/json",
             **dict(headers),
         }
 
-        composed_params = {"headers": headers, "verify": self.config.ssl_verify}
+        composed_params = {"headers": headers, "verify": self.proteus.config.ssl_verify}
         composed_params.update(params)
 
         if timeout:
             if isinstance(timeout, bool):
-                timeout = self.config.default_timeout
+                timeout = self.proteus.config.default_timeout
             # Set only connect timeout, not download timeout
             composed_params["timeout"] = (timeout, None)
 
@@ -81,10 +77,10 @@ class API:
 
         if retry is not None:
             if isinstance(retry, bool):
-                retry = self.config.default_retry_times
+                retry = self.proteus.config.default_retry_times
 
             if retry_delay is None:
-                retry_delay = self.config.default_retry_wait
+                retry_delay = self.proteus.config.default_retry_wait
 
             response = self.proteus.may_insist_up_to(times=retry, delay_in_secs=retry_delay)(_do_request)()
         else:
@@ -93,7 +89,7 @@ class API:
         return response
 
     def _post_files_presigned(self, url, files, headers=tuple()):
-        if not self.config.upload_presigned:
+        if not self.proteus.config.upload_presigned:
             return None
 
         # Pre-signed uploads should not include file contents
@@ -103,11 +99,13 @@ class API:
         url = self.build_url(url, presigned=True)
 
         headers = {
-            "Authorization": f"Bearer {self.auth.access_token}",
+            "Authorization": f"Bearer {self.proteus.auth.access_token}",
             **(headers or {}),
         }
 
-        original_response = requests.post(url, headers=headers, files=chopped_files, verify=self.config.ssl_verify)
+        original_response = requests.post(
+            url, headers=headers, files=chopped_files, verify=self.proteus.config.ssl_verify
+        )
 
         # Pre-signed not supported
         if original_response.status_code == 501:
@@ -116,7 +114,7 @@ class API:
         try:
             self.raise_for_status(original_response)
         except Exception as error:
-            self.logger.error(original_response.content)
+            self.proteus.logger.error(original_response.content)
             raise error
 
         file_info = original_response.json()["file"]
@@ -126,9 +124,15 @@ class API:
 
         file = next(iter(files.values()))[1]
 
-        if isinstance(file, Path):  # Path is needed, because a string will be the BLOB of the file
+        if isinstance(file, Path) and AZ_COPY_PRESENT:  # Path is needed, because a string will be the BLOB of the file
             file_path = str(file.absolute())
-            subprocess.Popen(["azcopy", "copy", file_path, file_info["presigned_url"]["url"]]).wait()
+            try:
+                self.proteus.bucket.run_azcopy("copy", file_path, file_info["presigned_url"]["url"])
+            except AzCopyError as e:
+                raise RuntimeError(
+                    f'Could not upload {file} to {file_info["presigned_url"]["url"]} via '
+                    f'azcopy: \n{e.out or ""}\n{e.err}'
+                )
         else:
             # If the file is a stream, ensure it has been rewound
             if hasattr(file, "seek"):
@@ -170,7 +174,7 @@ class API:
         try:
             self.raise_for_status(response)
         except Exception as error:
-            self.logger.error(response.content)
+            self.proteus.logger.error(response.content)
             raise error
 
         # Patch the file to the original response
@@ -207,7 +211,7 @@ class API:
         )
 
     def store_download(self, url, localpath, localname, stream=False, timeout=60, retry=None, retry_delay=None):
-        self.logger.info(f"Downloading {url} to {os.path.join(localpath)}")
+        self.proteus.logger.info(f"Downloading {url} to {os.path.join(localpath)}")
 
         r = self.download(url, stream=stream, timeout=timeout, retry=retry, retry_delay=retry_delay)
 
@@ -220,7 +224,7 @@ class API:
         with open(local, "wb") as f:
             f.write(r.content)
 
-        self.logger.info("Download complete")
+        self.proteus.logger.info("Download complete")
 
         return r.status_code
 
@@ -230,7 +234,7 @@ class API:
         url = f"{host}/{path}"
 
         # FIXME: This should be propagated up-down from the corresponding caller
-        if self.config.ignore_worker_status:
+        if self.proteus.config.ignore_worker_status:
             params = copy(params)
             params["ignore_status"] = "1"
 

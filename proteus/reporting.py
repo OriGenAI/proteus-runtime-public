@@ -4,9 +4,8 @@ from functools import wraps
 class Reporting:
     """Unifies logging and reporting to status API"""
 
-    def __init__(self, logger, api=None):
-        self.logger = logger
-        self.api = api
+    def __init__(self, proteus):
+        self.proteus = proteus
 
     def ensure_failed_is_reported(self, fn):
         @wraps(fn)
@@ -54,13 +53,13 @@ class Reporting:
             number (int): The number of actual elements completed
         """
         assert status is not None, "Status can't be set to None"
-        self.logger.info(
+        self.proteus.logger.info(
             message,
             extra={"status": status, "progress": progress, "result": result},
         )
 
         self._report(
-            self.api.auth.worker_uuid,
+            self.proteus.auth.worker_uuid,
             set_status=str(status),
             message=message,
             progress=progress,
@@ -107,6 +106,6 @@ class Reporting:
         report["number"] = number
         report["total"] = total
         data["report"] = report
-        response = self.api.post(status_url, data, retry=True)
-        self.api.raise_for_status(response)
+        response = self.proteus.api.post(status_url, data, retry=True)
+        self.proteus.api.raise_for_status(response)
         return response
