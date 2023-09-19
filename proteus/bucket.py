@@ -1,14 +1,79 @@
 import os
+import re
 import shutil
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from copy import deepcopy
 from multiprocessing.dummy import Pool
+from tempfile import TemporaryDirectory
 from threading import Thread
+from typing import Union
+from urllib.parse import urlparse
+from uuid import UUID
 
 from tqdm import tqdm
 
 AZ_COPY_PRESENT = shutil.which("azcopy") is not None
+
+
+class AzCopyError(RuntimeError):
+    def __init__(self, err, out, command):
+        super().__init__("AzCopy command failed")
+        self.err = err and err.decode()
+        self.out = out and out.decode()
+        self.command = command
+
+
+class ProteusBucketFileUrl:
+    BUCKET_FILE_V1_REGEX = re.compile(r"^/api/v1/buckets/(?P<bucket_id>[^/]+)/(?P<filepath_or_uuid>.+)$")
+
+    def __init__(self, proteus, url):
+        self.proteus = proteus
+        self.url = url
+        self.info = None
+        url_path = urlparse(url).path
+        url_parts = self.BUCKET_FILE_V1_REGEX.match(url)
+        if url_parts:
+            self.url_path = url_path
+            self.bucket_id = url_parts.group("bucket_id")
+            self.filepath_or_uuid = url_parts.group("filepath_or_uuid")
+            try:
+                self.uuid = UUID(self.filepath_or_uuid)
+            except ValueError:
+                self.filepath = self.filepath_or_uuid
+
+    def sync(self, timeout=60, retry=None, retry_delay=None):
+        if self.info is None:
+            self.info = self.proteus.api.get(
+                self.url,
+                timeout=timeout,
+                headers={"content-type": "application/json"},
+                retry=retry,
+                retry_delay=retry_delay,
+            ).json()["file"]
+
+            self.uuid = self.info["uuid"]
+            self.filepath = self.info["filepath"]
+
+    def generate_sas_url(self, timeout=60, retry=None, retry_delay=None):
+        return self.proteus.api.head(
+            self.url,
+            timeout=timeout,
+            headers={"content-type": "application/octet-stream"},
+            retry=retry,
+            retry_delay=retry_delay,
+            allow_redirects=False,
+        ).url
+
+    def __bool__(self):
+        return bool(self.bucket_id and self.filepath_or_uuid)
+
+    def __str__(self):
+        return self.url
+
+    def __repr__(self):
+        return self.url
 
 
 class Bucket:
@@ -27,13 +92,17 @@ class Bucket:
                 break
             data = self.proteus.api.get(next_, retry=True).json()
 
-    def _each_file_bucket(self, bucket_uuid, each_file_fn=lambda x: x, workers=3, **search):
+    def _each_file_bucket(self, bucket_uuid, each_file_fn=lambda x: x, workers=3, progress=True, **search):
         assert self.proteus.auth.access_token is not None
         response = self.proteus.api.get(f"/api/v1/buckets/{bucket_uuid}/files", per_page=1000, **search)
         total = response.json().get("total")
 
         for res in self.each_item_parallel(
-            total, items=self.iterate_pagination(response), each_item_fn=each_file_fn, workers=workers, progress=True
+            total,
+            items=self.iterate_pagination(response),
+            each_item_fn=each_file_fn,
+            workers=workers,
+            progress=progress,
         ):
             yield res
 
@@ -81,54 +150,116 @@ class Bucket:
             return False
 
     def will_do_file_download(self, target, force_replace=False):
-        def do_download(item, chunk_size=1024 * 1024):
-            url, path, size, ready = item["url"], item["filepath"], item["size"], item["ready"]
+        def _downloader(item, chunk_size=1024 * 1024):
+            url = item["url"]
+            do_download, target_filepath = self._calc_paths(item, target, force_replace)
 
-            if not ready:
-                self.proteus.logger.warning(f"File {path} is not ready, skipping")
-                return
-
-            target_filepath = os.path.normpath(os.path.join(target, path))
-            if not force_replace and self.is_file_already_present(target_filepath, size=size):
-                return False
+            if not do_download:
+                return target_filepath
 
             download = self.proteus.api.download(url, stream=True, retry=True)
             self.store_stream_in(download, target_filepath, chunk_size=chunk_size)
-            return path
 
-        return do_download
+            return target_filepath
+
+        return _downloader
+
+    def _calc_paths(self, bucket_file_payload, target, force_replace):
+        path, size, ready = bucket_file_payload["filepath"], bucket_file_payload["size"], bucket_file_payload["ready"]
+
+        target_filepath = os.path.normpath(os.path.join(target, path))
+
+        os.makedirs(os.path.dirname(target_filepath), exist_ok=True)
+
+        if not ready:
+            self.proteus.logger.warning(f"File {path} is not ready, skipping")
+            return False, target_filepath
+
+        if not force_replace and self.is_file_already_present(target_filepath, size=size):
+            return False, target_filepath
+
+        return True, target_filepath
 
     def get_bucket_info(self, bucket_uuid):
         response = self.proteus.api.get(f"/api/v1/buckets/{bucket_uuid}")
         return response.json()
 
-    def download_via_azcopy(self, bucket_uuid, target_folder, workers=8, replace=False, **search):
+    @contextmanager
+    def _download_via_azcopy_tmp_folder(self, target_folder):
+        with TemporaryDirectory(prefix="_azcopy", dir=target_folder) as tmpdir:
+            yield tmpdir
+
+    def download_via_azcopy(self, bucket_uuid_or_file_url, target_folder, workers=8, replace=False, **search):
+        try:
+            bucket_uuid = UUID(bucket_uuid_or_file_url)
+            file_bucket_url = None
+        except ValueError:
+            bucket_uuid = None
+            file_bucket_url = self.proteus_bucket_file(bucket_uuid_or_file_url)
+
+        if bucket_uuid is None and file_bucket_url is None:
+            raise AzCopyError(
+                f"Cannot download {bucket_uuid_or_file_url}: neither a bucket UUID or a "
+                f"bucket file URL (like /api/v1/<bucket_uuid>/files/<file_uuid>)"
+            )
+
+        if bucket_uuid:
+            files = self._download_via_azcopy_bucket(
+                str(bucket_uuid), target_folder, workers=8, force_replace=replace, **search
+            )
+            for dst_file_path in files:
+                yield dst_file_path
+        elif file_bucket_url:
+            yield self._download_via_azcopy_single(file_bucket_url, target_folder)
+        else:
+            raise RuntimeError("Unreachable state")
+
+    def _download_via_azcopy_single(
+        self, file_bucket_url: ProteusBucketFileUrl, target_folder: str, force_replace=False
+    ):
+        file_bucket_url.sync()
+        do_download, target_filepath = self._calc_paths(file_bucket_url.info, target_folder, force_replace)
+
+        if not do_download:
+            return target_filepath
+
+        sas_url = file_bucket_url.generate_sas_url()
+
+        with self._download_via_azcopy_tmp_folder(target_folder) as target_folder_tmp:
+            self.proteus.bucket.run_azcopy("copy", sas_url, target_folder_tmp, "--recursive")
+            az_copy_path = os.path.join(target_folder_tmp, os.path.basename(file_bucket_url.filepath))
+            shutil.move(az_copy_path, target_filepath)
+
+            return target_filepath
+
+    def _download_via_azcopy_bucket(self, bucket_uuid, target_folder, workers=8, force_replace=False, **search):
+
         bucket_info = self.get_bucket_info(bucket_uuid)
 
-        files = []
+        with self._download_via_azcopy_tmp_folder(target_folder) as target_folder_tmp:
 
-        target_folder = os.path.join(os.getcwd(), target_folder)
-        target_folder_tmp = os.path.join(target_folder, "tmp")
+            files = []
 
-        file_metadata_downloader_error = None
+            target_folder = os.path.join(os.getcwd(), target_folder)
+            file_metadata_downloader_error = None
 
-        def file_metadata_downloader():
-            try:
-                self.proteus.logger.info("Obtaining files metadata")
-                for file in self._each_file_bucket(bucket_uuid, workers=workers, **search):
-                    if file["ready"]:
-                        files.append(file)
-            except BaseException as e:
-                nonlocal file_metadata_downloader_error
-                file_metadata_downloader_error = e
+            def file_metadata_downloader():
+                try:
+                    self.proteus.logger.info("Obtaining files metadata")
+                    for file in self._each_file_bucket(bucket_uuid, workers=workers, progress=False, **search):
+                        do_download, target_filepath = self._calc_paths(file, target_folder, force_replace)
+                        src_file_path = os.path.join(target_folder_tmp, bucket_uuid, file["uuid"], file["filepath"])
+                        if file["ready"]:
+                            file["src"] = src_file_path
+                            file["dst"] = target_filepath
+                            file["do_download"] = do_download
+                            files.append(file)
+                except BaseException as e:
+                    nonlocal file_metadata_downloader_error
+                    file_metadata_downloader_error = e
 
-        metadata_downloader_thread = Thread(target=file_metadata_downloader, daemon=True)
+            metadata_downloader_thread = Thread(target=file_metadata_downloader, daemon=True)
 
-        target_folder_tmp_exists = os.path.exists(target_folder_tmp) and os.path.isdir(target_folder_tmp)
-
-        if not target_folder_tmp_exists:
-            os.makedirs(target_folder_tmp, exist_ok=True)
-        try:
             self.proteus.logger.info("Downloading files")
             metadata_downloader_thread.run()
 
@@ -146,24 +277,10 @@ class Bucket:
                 raise file_metadata_downloader_error
 
             for file in files:
-                src_file_path = os.path.join(target_folder_tmp, bucket_uuid, file["uuid"], file["filepath"])
-                dst_file_dir = os.path.join(target_folder, os.path.dirname(file["filepath"]))
+                if file["do_download"]:
+                    shutil.move(file["src"], file["dst"])
 
-                dst_file_path = os.path.join(target_folder, file["filepath"])
-                os.makedirs(dst_file_dir, exist_ok=True)
-                if not target_folder_tmp_exists:
-                    shutil.move(src_file_path, dst_file_path)
-                else:
-                    shutil.copy(src_file_path, dst_file_path)
-                yield dst_file_path
-        finally:
-            if not target_folder_tmp_exists:
-                shutil.rmtree(target_folder_tmp)
-
-    def _download_via_azcopy_process(self, target_folder_tmp, target):
-        return subprocess.Popen(
-            ["azcopy", "copy", target, target_folder_tmp, "--recursive"],
-        )
+                yield file["dst"]
 
     def download(self, bucket_uuid, target_folder, workers=32, replace=False, via="azcopy", **search):
         if via not in ("azcopy", "api_files"):
@@ -207,10 +324,11 @@ class Bucket:
                 out, err = azcopy_cmd.communicate()
                 raise AzCopyError(err, out, command)
 
+    def proteus_bucket_file(self, url) -> Union[ProteusBucketFileUrl, None]:
+        if not self.proteus.api.is_proteus_host(url):
+            return None
 
-class AzCopyError(RuntimeError):
-    def __init__(self, err, out, command):
-        super().__init__("AzCopy command failed")
-        self.err = err and err.decode()
-        self.out = out and out.decode()
-        self.command = command
+        return ProteusBucketFileUrl(self.proteus, url)
+
+    def is_proteus_bucket_file_url(self, url):
+        return bool(self.proteus_bucket_file(url))

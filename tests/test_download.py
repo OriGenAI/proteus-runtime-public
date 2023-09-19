@@ -1,6 +1,8 @@
 import os
+
 import pytest
 from pytest_bdd import scenario, given, when, then, parsers
+
 from proteus import Proteus
 
 proteus = Proteus()
@@ -80,7 +82,7 @@ def stored_file(
 ):
     stream = stream == "True"
     timeout = int(timeout) if timeout != "None" else None
-    assert store_res == 200
+    assert store_res == os.path.join(localpath, localname)
     mocked_api_get.assert_called_once()
     assert os.path.exists(os.path.join(localpath, localname))
     os.remove(os.path.join(localpath, localname))

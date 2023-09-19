@@ -1,12 +1,12 @@
-from os.path import join
-
 from requests.models import Response
 
 
 class Runs:
-    runs_path: str = "api/v2/runs/"
-    sections_path: str = "api/v2/runs/{run_id}/data/sections/"
-    series_path: str = "api/v2/runs/{run_id}/data/series/"
+    runs_path: str = "/api/v2/runs/"
+    sections_path: str = "/api/v2/runs/{run_id}/data/sections/"
+    series_path: str = "/api/v2/runs/{run_id}/data/series/"
+    series_detail_path: str = "/api/v2/runs/{run_id}/data/series/{series_id}/"
+    run_detail_path: str = "/api/v2/runs/{run_id}/"
 
     def __init__(self, proteus):
         self.proteus = proteus
@@ -14,16 +14,16 @@ class Runs:
     def get_runs(self) -> Response:
         return self.proteus.api.get(self.runs_path)
 
-    def create_run(self, run_id: str, run_type: str) -> Response:
-        payload = {"id": run_id, "type": run_type}
+    def create_run(self, run_id: str, project_id: str, run_type: str) -> Response:
+        payload = {"id": run_id, "type": run_type, "project_uuid": project_id, "name": f"{run_type} {run_id}"}
         return self.proteus.api.post(self.runs_path, payload)
 
     def get_run(self, run_id: str) -> Response:
-        path = join(self.runs_path, run_id)
+        path = self.run_detail_path.format(self.runs_path, run_id=run_id)
         return self.proteus.api.get(path)
 
     def delete_run(self, run_id: str) -> Response:
-        path = join(self.runs_path, run_id)
+        path = self.run_detail_path.format(self.runs_path, run_id=run_id)
         return self.proteus.api.delete(path)
 
     def get_series_list(self, run_id: str) -> Response:
@@ -43,16 +43,16 @@ class Runs:
         return self.proteus.api.post(path, payload)
 
     def get_series_detail(self, run_id: str, series_id: str) -> Response:
-        path = join(self.series_path.format(run_id=run_id), series_id)
+        path = self.series_path.format(run_id=run_id, series_id=series_id)
         return self.proteus.api.get(path)
 
     def patch_series(self, run_id: str, series_id: str, status: str) -> Response:
-        path = join(self.series_path.format(run_id=run_id), series_id)
+        path = self.series_path.format(run_id=run_id, series_id=series_id)
         payload = {"status": status}
         return self.proteus.api.patch(path, payload)
 
     def put_series(self, run_id: str, series_id: str, data: list) -> Response:
-        path = join(self.series_path.format(run_id=run_id), series_id)
+        path = self.series_path.format(run_id=run_id, series_id=series_id)
         payload = {"data": data}
         return self.proteus.api.put(path, payload)
 

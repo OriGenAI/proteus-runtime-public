@@ -1,9 +1,12 @@
 import json
 import os
+import shutil
 import uuid
 from copy import copy
 from pathlib import Path
-from urllib.parse import urlencode, quote_plus
+from tempfile import TemporaryDirectory
+from typing import Union
+from urllib.parse import urlencode, quote_plus, urlparse
 
 import requests
 from azure.storage.blob import BlobClient, BlobBlock
@@ -20,9 +23,25 @@ class API:
         self.host = proteus.config.api_host
         self.host_v2 = proteus.config.api_host_v2
 
-    def get(self, url, headers=tuple(), stream=False, retry=None, retry_delay=None, timeout=True, **query_args):
+    def get(self, *args, **kwargs):
+        return self._get_head("get", *args, **kwargs)
+
+    def head(self, *args, **kwargs):
+        return self._get_head("head", *args, **kwargs)
+
+    def _get_head(
+        self,
+        method,
+        url,
+        headers=tuple(),
+        stream=False,
+        retry=None,
+        retry_delay=None,
+        timeout: Union[bool, int] = True,
+        **query_args,
+    ):
         return self.request(
-            "get",
+            method,
             url,
             headers=headers,
             params=query_args,
@@ -32,27 +51,31 @@ class API:
             timeout=timeout,
         )
 
-    def patch(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout=True):
+    def patch(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout: Union[bool, int] = True):
         return self.request(
             "patch", url, headers=headers, json=data, retry=retry, retry_delay=retry_delay, timeout=timeout
         )
 
-    def put(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout=True):
+    def put(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout: Union[bool, int] = True):
         return self.request(
             "put", url, headers=headers, json=data, retry=retry, retry_delay=retry_delay, timeout=timeout
         )
 
-    def post(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout=True):
+    def post(self, url, data, headers=tuple(), retry=None, retry_delay=None, timeout: Union[bool, int] = True):
         return self.request(
             "post", url, headers=headers, json=data, retry=retry, retry_delay=retry_delay, timeout=timeout
         )
 
-    def delete(self, url, headers=tuple(), retry=None, retry_delay=None, timeout=True, **query_args):
+    def delete(
+        self, url, headers=tuple(), retry=None, retry_delay=None, timeout: Union[bool, int] = True, **query_args
+    ):
         return self.request(
             "delete", url, headers=headers, params=query_args, retry=retry, retry_delay=retry_delay, timeout=timeout
         )
 
-    def request(self, method, url, headers=tuple(), retry=None, retry_delay=None, timeout=True, **params):
+    def request(
+        self, method, url, headers=tuple(), retry=None, retry_delay=None, timeout: Union[bool, int] = True, **params
+    ):
         url = self.build_url(url)
 
         headers = {
@@ -75,6 +98,14 @@ class API:
             self.raise_for_status(res)
             return res
 
+        return self._retry(_do_request, retry, retry_delay)
+
+    def _retry(
+        self,
+        fn,
+        retry=None,
+        retry_delay=None,
+    ):
         if retry is not None:
             if isinstance(retry, bool):
                 retry = self.proteus.config.default_retry_times
@@ -82,9 +113,9 @@ class API:
             if retry_delay is None:
                 retry_delay = self.proteus.config.default_retry_wait
 
-            response = self.proteus.may_insist_up_to(times=retry, delay_in_secs=retry_delay)(_do_request)()
+            response = self.proteus.may_insist_up_to(times=retry, delay_in_secs=retry_delay)(fn)()
         else:
-            response = _do_request()
+            response = fn()
 
         return response
 
@@ -213,25 +244,74 @@ class API:
     def store_download(self, url, localpath, localname, stream=False, timeout=60, retry=None, retry_delay=None):
         self.proteus.logger.info(f"Downloading {url} to {os.path.join(localpath)}")
 
-        r = self.download(url, stream=stream, timeout=timeout, retry=retry, retry_delay=retry_delay)
-
         os.makedirs(localpath, exist_ok=True)
         local = localpath
 
         if localname is not None:
             local = os.path.join(local, localname)
 
+        if False and self.proteus.bucket.is_proteus_bucket_file_url(url):
+            try:
+                with TemporaryDirectory(dir=os.path.dirname(local), suffix="." + os.path.basename(local)) as tmpdir:
+                    download_path = list(self.proteus.bucket.download(url, tmpdir))[0]
+                    shutil.move(download_path, local)
+
+                return local
+            except BaseException as e:
+                self.proteus.logger.warn(
+                    f"Tried to download {url} as bucket URL but failed. Reverting to regular download."
+                )
+                self.proteus.logger.warn(e)
+
+        r = self.get(
+            url,
+            stream=stream,
+            timeout=timeout,
+            headers={"content-type": "application/octet-stream"},
+            retry=retry,
+            retry_delay=retry_delay,
+            allow_redirects=False,
+        )
+
         with open(local, "wb") as f:
             f.write(r.content)
 
-        self.proteus.logger.info("Download complete")
+        return local
 
-        return r.status_code
+    def get_host(self, url):
+        # Relative host, use
+        host = self.get_proteus_host(url)
+
+        if host is None:
+            parsed_uri = urlparse(url)
+            host = parsed_uri.hostname
+
+        if host is None:
+            raise RuntimeError(f"Could not obtain a host from URL {url}")
+
+        return host
+
+    def get_proteus_host(self, url: str):
+        """
+        Given a complete or relative URL, returns the URL host points to proteus
+        """
+
+        if url.startswith("/"):
+            host = self.host if not (self.host_v2 and url.startswith("/api/v2/")) else self.host_v2
+        else:
+            parsed_uri = urlparse(url)
+            maybe_proteus_host = f"{parsed_uri.scheme}://{parsed_uri.hostname}"
+            host = maybe_proteus_host if maybe_proteus_host in (self.host_v2, self.host) else None
+
+        return host
+
+    def is_proteus_host(self, url: str):
+        return self.get_host(url) is not None
 
     def build_url(self, url, **params):
-        path = url.strip("/") if not url.startswith("api/v2/") else url
-        host = self.host if not (self.host_v2 and url.startswith("api/v2/")) else self.host_v2
-        url = f"{host}/{path}"
+        path = url.rstrip("/") if not url.startswith("/api/v2/") else url
+        host = self.get_host(url)
+        url = host + path
 
         # FIXME: This should be propagated up-down from the corresponding caller
         if self.proteus.config.ignore_worker_status:
