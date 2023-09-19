@@ -250,7 +250,7 @@ class API:
         if localname is not None:
             local = os.path.join(local, localname)
 
-        if False and self.proteus.bucket.is_proteus_bucket_file_url(url):
+        if self.proteus.bucket.is_proteus_bucket_file_url(url):
             try:
                 with TemporaryDirectory(dir=os.path.dirname(local), suffix="." + os.path.basename(local)) as tmpdir:
                     download_path = list(self.proteus.bucket.download(url, tmpdir))[0]

@@ -34,14 +34,18 @@ class ProteusBucketFileUrl:
         self.info = None
         url_path = urlparse(url).path
         url_parts = self.BUCKET_FILE_V1_REGEX.match(url)
-        if url_parts:
-            self.url_path = url_path
-            self.bucket_id = url_parts.group("bucket_id")
-            self.filepath_or_uuid = url_parts.group("filepath_or_uuid")
-            try:
-                self.uuid = UUID(self.filepath_or_uuid)
-            except ValueError:
-                self.filepath = self.filepath_or_uuid
+
+        self.url_path = url_path
+
+        self.bucket_id = url_parts.group("bucket_id") if url_parts else None
+        self.filepath_or_uuid = url_parts.group("filepath_or_uuid") if url_parts else None
+
+        try:
+            self.uuid = UUID(self.filepath_or_uuid) if url_parts else None
+            self.filepath = None
+        except ValueError:
+            self.filepath = self.filepath_or_uuid
+            self.uuid = None
 
     def sync(self, timeout=60, retry=None, retry_delay=None):
         if self.info is None:

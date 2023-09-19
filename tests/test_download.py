@@ -22,7 +22,7 @@ def test_download(session):
 
 @given("an url", target_fixture="url")
 def url():
-    return ""
+    return "http://www.example.com/file.txt"
 
 
 @given("a path", target_fixture="localpath")
