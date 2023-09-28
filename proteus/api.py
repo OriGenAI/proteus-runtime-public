@@ -79,7 +79,6 @@ class API:
         url = self.build_url(url)
 
         headers = {
-            "Authorization": f"Bearer {self.proteus.auth.access_token}",
             "Content-Type": "application/json",
             **dict(headers),
         }
@@ -94,9 +93,13 @@ class API:
             composed_params["timeout"] = (timeout, None)
 
         def _do_request():
-            res = requests.request(method, url, **composed_params)
-            self.raise_for_status(res)
-            return res
+            def request_fn():
+                composed_params["headers"]["Authorization"] = f"Bearer {self.proteus.auth.access_token}"
+                return requests.request(method, url, **composed_params)
+
+            res = request_fn()
+            retried_res = self.raise_for_status(res, retry_refresh_fn=request_fn)
+            return retried_res or res
 
         return self._retry(_do_request, retry, retry_delay)
 
@@ -201,12 +204,6 @@ class API:
             f'/api/v1/buckets/{file_info["presigned_url"]["bucket_uuid"]}/files/{file_info["uuid"]}',
             {"file": {"ready": True}},
         )
-
-        try:
-            self.raise_for_status(response)
-        except Exception as error:
-            self.proteus.logger.error(response.content)
-            raise error
 
         # Patch the file to the original response
         original_response_json = original_response.json()
@@ -324,7 +321,7 @@ class API:
 
         return url
 
-    def raise_for_status(self, response: Response):
+    def raise_for_status(self, response: Response, retry_refresh_fn=None):
         try:
             response.raise_for_status()
         except HTTPError as http_error:
@@ -334,6 +331,23 @@ class API:
                     http_error.args = (
                         f"{http_error.args[0]}. Returned error " f"payload: {json.dumps(error_detail, indent=2)}",
                     )
+
+                message = error_detail.get("message", error_detail.get("msg", None))
+                do_retry_with_new_token = (
+                    retry_refresh_fn
+                    and isinstance(error_detail, dict)
+                    and message == "Expired token provided, please refresh"
+                )
+
+                if do_retry_with_new_token:
+                    self.proteus.auth.do_refresh()
+                    retry_res = retry_refresh_fn()
+                    self.raise_for_status(retry_res)
+                    return retry_res
+
             except JSONDecodeError:
                 pass
+
             raise http_error
+
+        return None

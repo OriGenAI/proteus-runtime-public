@@ -60,10 +60,8 @@ class OIDC:
 
     @property
     def access_token(self):
-        self._access_token_locked.acquire()
-        result = self._access_token
-        self._access_token_locked.release()
-        return result
+        with self._access_token_locked:
+            return self._access_token
 
     @property
     def access_token_parsed(self):
