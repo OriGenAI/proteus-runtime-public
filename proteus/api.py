@@ -249,7 +249,8 @@ class API:
 
         if self.proteus.bucket.is_proteus_bucket_file_url(url):
             try:
-                with TemporaryDirectory(dir=os.path.dirname(local), suffix="." + os.path.basename(local)) as tmpdir:
+                with TemporaryDirectory(suffix="." + os.path.basename(local)) as tmpdir:
+                    tmpdir = os.path.join(tmpdir, os.path.dirname(local))
                     download_path = list(self.proteus.bucket.download(url, tmpdir))[0]
                     shutil.move(download_path, local)
 

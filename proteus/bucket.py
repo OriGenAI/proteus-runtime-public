@@ -190,8 +190,8 @@ class Bucket:
 
     @contextmanager
     def _download_via_azcopy_tmp_folder(self, target_folder):
-        with TemporaryDirectory(prefix="_azcopy", dir=target_folder) as tmpdir:
-            yield tmpdir
+        with TemporaryDirectory(prefix="_azcopy") as tmpdir:
+            yield os.path.join(tmpdir, target_folder)
 
     def download_via_azcopy(self, bucket_uuid_or_file_url, target_folder, workers=8, replace=False, **search):
         try:
