@@ -9,6 +9,7 @@ from .logger import initialize_logger
 from .oidc import OIDC, is_worker_username
 from .reporting import Reporting
 from .runs import Runs
+from .safe import Safely
 from .vault import Vault
 
 
@@ -22,6 +23,7 @@ class Proteus:
         self.runs = Runs(self)
         self.vault = Vault(self)
         self.bucket = Bucket(self)
+        self.safely = Safely(self)
 
     def runs_authentified(self, func=None, user=None, password=None):
         """Decorator that authentifies and keeps token updated during execution."""
@@ -50,8 +52,8 @@ class Proteus:
         if not func:
             return RunsAuthentifiedContextManager(runtime=self, ctx_user=user, ctx_password=password)
 
-        wrapped_user = user
-        wrapped_password = password
+        wrapped_user = user or self.config.username
+        wrapped_password = password or self.config.password
 
         @wraps(func)
         def wrapper(user=wrapped_user, password=wrapped_password, *fn_args, **fn_kwargs):

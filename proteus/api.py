@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import typing
 import uuid
 from copy import copy
 from pathlib import Path
@@ -14,14 +15,22 @@ from requests import Response, HTTPError, JSONDecodeError
 
 from proteus.bucket import AZ_COPY_PRESENT, AzCopyError
 
+if typing.TYPE_CHECKING:
+    from . import Proteus
+
 
 class API:
     CONTENT_CHUNK_SIZE = 10 * 1024 * 1024
 
-    def __init__(self, proteus):
+    def __init__(self, proteus: "Proteus"):
         self.proteus = proteus
         self.host = proteus.config.api_host
         self.host_v2 = proteus.config.api_host_v2
+
+        if not self.proteus.config.ssl_verify:
+            import urllib3
+
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     def get(self, *args, **kwargs):
         return self._get_head("get", *args, **kwargs)
