@@ -18,8 +18,8 @@ class Config:
     vault_host: str = "https://vault.dev.origen.ai"
     vault_username: Optional[str] = None
     vault_password: Optional[str] = None
-    username: str = "user-not-configured"
-    password: str = "password-not-configured"
+    username: Optional[str] = ""
+    password: Optional[str] = ""
     realm: str = "origen"
     client_id: str = "proteus-front"
     refresh_gap: int = 10  # Seconds
