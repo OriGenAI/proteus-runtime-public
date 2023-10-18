@@ -1,4 +1,5 @@
 import requests
+from requests.exceptions import HTTPError
 
 
 class Vault:
@@ -14,7 +15,11 @@ class Vault:
         data = {"jwt": auth.access_token, "role": "worker"}
         response = requests.post(f"{self.proteus.config.vault_host}/{url}", headers=headers, json=data)
         self.proteus.api.raise_for_status(response)
-        self._vault_token = response.json().get("auth").get("client_token")
+        self.set_token(
+            token=response.json().get("auth").get("client_token"),
+            username=self.proteus.auth.who,
+            user_type="proteus_jwt",
+        )
         return self
 
     def authenticate_with_userpass(self, username, password):
@@ -26,11 +31,17 @@ class Vault:
         response = requests.post(f"{self.proteus.config.vault_host}/{url}", headers=headers, json=data)
         self.proteus.api.raise_for_status(response)
         token = response.json().get("auth").get("client_token")
-        return self.set_token(token)
+        return self.set_token(token, username=username, user_type="vault_user")
 
-    def set_token(self, token):
+    def set_token(self, token, username=None, user_type=None):
+        self._vault_user_type = user_type
+        self._vault_user = username
         self._vault_token = token
         return self
+
+    @property
+    def is_logged_in(self):
+        return bool(self._vault_token)
 
     def get_config(self, image_ref):
         assert self._vault_token is not None, "Run authenticate_with_jwt/authenticate_with_userpass before"
@@ -39,12 +50,28 @@ class Vault:
             "Content-Type": "application/json",
         }
         url = f"v1/epyc-keys/data/{image_ref}"
-        print(f"requesting key {self.proteus.config.vault_host}/{url}")
+        self.proteus.logger.info(f"requesting key {self.proteus.config.vault_host}/{url}")
         response = requests.get(f"{self.proteus.config.vault_host}/{url}", headers=headers)
-        self.proteus.api.raise_for_status(response)
-        response_json = response.json()
-        print("got response", response)
-        data = response_json.get("data")
+
+        try:
+            self.proteus.api.raise_for_status(response)
+            response_json = response.json()
+            data = response_json.get("data")
+        except HTTPError as e:
+            status_code = getattr(e.response, "status_code")
+            if status_code == 403 and self._vault_user and self._vault_user_type:
+                raise RuntimeError(
+                    f'User "{self._vault_user}" of type "{self._vault_user_type}" is not allowed to access {image_ref}'
+                ) from e
+
+            if status_code != 404:
+                raise
+
+            self.proteus.logger.warn(
+                f"Received status 404 when trying to retrieve vault key {image_ref}, the key doesn't exists"
+            )
+            data = None
+
         if data is not None and "data" in data:
             data = data.get("data")
         return data

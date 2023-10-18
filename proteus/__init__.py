@@ -15,7 +15,7 @@ from .vault import Vault
 
 class Proteus:
     def __init__(self, config: Config = None) -> None:
-        self.config = config or Config()
+        self.config: Config = config or Config()
         self.logger = initialize_logger(self.config.log_loc)
         self.auth = OIDC(self)
         self.api = API(self)

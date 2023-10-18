@@ -31,7 +31,7 @@ class Config:
     default_timeout = 30  # s
     worker_uuid: Optional[str] = None
 
-    safety_enabled: Optional[bool] = False
+    safely_enabled: Optional[bool] = False
     safely_path: Optional[str] = "private"
     safely_image: Optional[str] = None
     safely_key: Optional[str] = None
@@ -54,7 +54,6 @@ class Config:
             ("OIDC_WORKERS_REALM", "REALM"),
             ("OIDC_REALM", "REALM"),
             ("CURRENT_IMAGE", "SAFELY_IMAGE"),
-            ("REGISTRY", "SAFELY_REGISTRY"),
             ("SAFETY_PATH", "SAFELY_PATH"),
         ):
             if final_name not in os.environ and alternate_name in os.environ:

@@ -1,63 +1,16 @@
-import glob
 import os
-import py_compile
-import shutil
 import sys
-import typing
-from base64 import b64decode, b64encode
 from functools import wraps
 from importlib.abc import PathEntryFinder
 from importlib.machinery import FileFinder, SourcelessFileLoader
-from pathlib import Path
 
-from Crypto import Random
 from Crypto.Cipher import AES
 from Crypto.Util import Padding
 
-if typing.TYPE_CHECKING:
-    from . import Proteus
+from .common import SafelyCommonBase
 
 
-def random_bytes(size):
-    return Random.new().read(size)
-
-
-def generate_aes_cipher(key_size=32):
-    return {
-        "type": "aes256",
-        "key": b64encode(random_bytes(key_size)).decode("utf-8", "ignore"),
-    }
-
-
-def create_folder(path, source_root, target_root):
-    target_file = path.replace(source_root, target_root)
-    target_folder = "/".join(target_file.split("/")[:-1])
-    Path(target_folder).mkdir(parents=True, exist_ok=True)
-
-
-def protect_source_file(safely, source_file, source_root, target_root):
-    target_file = source_file.replace(source_root, target_root).replace(".py", ".epyc")
-    compiled = py_compile.compile(source_file)
-    with open(compiled, "rb") as source:
-        safely.store(source, target_file)
-        print(f"{source_file} --> {target_file}")
-
-
-def copy_to_path_protected(safely, source_root, target_root):
-    entries = glob.glob(source_root + "/**", recursive=True)
-    for path in entries:
-        create_folder(path, source_root, target_root)
-        if os.path.isfile(path):
-            filepath = path
-            if filepath.endswith(".py"):
-                protect_source_file(safely, filepath, source_root, target_root)
-            else:
-                target_filepath = path.replace(source_root, target_root)
-                shutil.copy2(filepath, target_filepath)
-        continue
-
-
-def EPyCLoaderWithContext(safely: "Safely"):
+def EPyCLoaderWithContext(safely: "SafelyDecipherMixin"):
     class _EPyCLoader(SourcelessFileLoader):
         def __init__(self, fullname, path):
             self.fullname = fullname
@@ -184,7 +137,7 @@ class MetaFileFinder:
             finder.invalidate_caches()
 
     @classmethod
-    def install(cls, safely: "Safely", basepath=None):
+    def install(cls, safely: "SafelyDecipherMixin", basepath=None):
         """
         Install the MetaFileFinder in the front sys.path_hooks, so that
         it can support any existing sys.path_hooks and any that might
@@ -211,35 +164,9 @@ class MetaFileFinder:
                     del sys.path_importer_cache[path]
 
 
-class Safely:
-    def __init__(self, proteus: "Proteus"):
-        self.proteus = proteus
-        self.config = None
+class SafelyDecipherMixin(SafelyCommonBase):
 
-    def init(self, auth=None, image_ref=None, key=None, key_type=None):
-        if key and key_type:
-            self.config = {"cipher": {"key": key, "type": key_type}}
-        elif auth and image_ref:
-            self.config = self.proteus.vault.authenticate_with_jwt(auth).get_config(image_ref)
-        else:
-            raise RuntimeError("Missing config for safely. Please provide either auth/image_ref or key/key_type")
-
-    def get_cipher(self, iv):
-        config = self.config
-        cipher = config.get("cipher", {})
-        cipher_type = cipher.get("type")
-        if cipher_type == "aes256":
-            key = b64decode(cipher.get("key"))
-            return AES.new(key, AES.MODE_CBC, iv)
-        raise Exception(f"Unknown encryption type {cipher_type}")
-
-    def store(self, stream, path):
-        with open(path, "wb") as output:
-            iv = random_bytes(AES.block_size)
-            output.write(iv)
-            cipher = self.get_cipher(iv)
-            ciphered_text = cipher.encrypt(Padding.pad(stream.read(), AES.block_size))
-            output.write(ciphered_text)
+    PROTECTED_READ_PATHS = {}
 
     def retrieve(self, path):
         with open(path, "rb") as stream:
@@ -252,59 +179,29 @@ class Safely:
 
             return Padding.unpad(cleartext, AES.block_size)
 
-    def protected(self, basepath="private"):
+    def enable_protected_read(self, basepath):
         MetaFileFinder.install(self, basepath)
+        self.PROTECTED_READ_PATHS = basepath
         return self
 
     def runs_safely(self, func):
         """Decorator obtains key to perform critic code safely."""
 
-        if not self.proteus.config.safety_enabled:
+        if not self.proteus.config.safely_enabled:
             self.proteus.logger.warning("Warning. Safety is disabled")
             return func
 
         @wraps(func)
         def wrapper(*args, **kwargs):
 
+            if not self.proteus.config.safely_path:
+                raise RuntimeError("SAFELY_PATH proteus config is not set")
+
             if self.config is None:
-                if not self.proteus.config.safely_path:
-                    raise RuntimeError("SAFELY_PATH proteus config is not set")
+                self._init_auto()
 
-                method_auth_explicit_key = self.proteus.config.safely_key and self.proteus.config.safely_key_type
-                method_auth_vault_enabled = (
-                    method_auth_explicit_key
-                    or self.proteus.config.vault_host
-                    and self.proteus.config.vault_username
-                    and self.proteus.config.vault_password
-                    and self.proteus.config.safely_image
-                )
-
-                if not method_auth_explicit_key and not method_auth_vault_enabled:
-                    raise RuntimeError(
-                        """Not enough information to run safely. Please either provide:
-  * Proteus SAFELY_KEY and SAFELY_KEY_TYPE(optional) config
-  * Proteus USERNAME, PASSWORD, VAULT_HOST, VAULT_USERNAME, VAULT_PASSWORD and SAFELY_IMAGE config
-"""
-                    )
-
-                def _init():
-                    kwargs = {}
-
-                    if method_auth_vault_enabled:
-                        kwargs.update(dict(auth=self.proteus.auth, image_ref=self.proteus.config.safely_image))
-
-                    if method_auth_explicit_key:
-                        kwargs.update(
-                            dict(key=self.proteus.config.safely_key, key_type=self.proteus.config.safely_key_type)
-                        )
-
-                    self.proteus.safely.init(**kwargs)
-                    self.proteus.safely.protected(basepath=self.proteus.config.safely_path)
-
-                if method_auth_vault_enabled and not self.proteus.auth.who:
-                    _init = self.proteus.runs_authentified(_init)
-
-                _init()
+            if self.proteus.config.safely_path not in self.PROTECTED_READ_PATHS:
+                self.proteus.safely.enable_protected_read(basepath=self.proteus.config.safely_path)
 
             return func(*args, **kwargs)
 
