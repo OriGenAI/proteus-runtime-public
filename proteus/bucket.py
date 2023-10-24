@@ -190,8 +190,18 @@ class Bucket:
 
     @contextmanager
     def _download_via_azcopy_tmp_folder(self, target_folder):
-        with TemporaryDirectory(prefix="_azcopy") as tmpdir:
-            yield os.path.join(tmpdir, target_folder)
+        if os.path.isabs(target_folder):
+            with TemporaryDirectory(prefix="_azcopy", dir=target_folder) as tmpdir:
+                yield tmpdir
+        else:
+            with TemporaryDirectory(prefix="_azcopy") as tmpdir:
+                yield tmpdir
+
+        try:
+            shutil.rmtree(tmpdir)
+        except FileNotFoundError as e:
+            if f"'{tmpdir}'" not in str(e):
+                raise
 
     def download_via_azcopy(self, bucket_uuid_or_file_url, target_folder, workers=8, replace=False, **search):
         try:
