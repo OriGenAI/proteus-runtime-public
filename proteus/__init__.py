@@ -9,6 +9,7 @@ from .logger import initialize_logger
 from .oidc import OIDC, is_worker_username
 from .reporting import Reporting
 from .runs import Runs
+from .stats import RunExecutionStats
 from .safe import Safely
 from .vault import Vault
 
@@ -20,9 +21,10 @@ class Proteus:
         self.auth = OIDC(self)
         self.api = API(self)
         self.reporting = Reporting(self)
-        self.runs = Runs(self)
+        self.run_stats = RunExecutionStats(self)
         self.vault = Vault(self)
         self.bucket = Bucket(self)
+        self.runs = Runs(self)
         self.safely = Safely(self)
 
     def runs_authentified(self, func=None, user=None, password=None):
