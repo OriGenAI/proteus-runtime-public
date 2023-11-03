@@ -6,11 +6,11 @@ from .api import API
 from .bucket import Bucket
 from .config import Config
 from .logger import initialize_logger
-from .oidc import OIDC, is_worker_username
+from .oidc import OIDC
 from .reporting import Reporting
 from .runs import Runs
-from .stats import RunExecutionStats
 from .safe import Safely
+from .stats import RunExecutionStats
 from .vault import Vault
 
 
@@ -38,10 +38,7 @@ class Proteus:
 
             def __enter__(self):
                 terms = dict(username=self.ctx_user, password=self.ctx_password, auto_update=True)
-                is_worker = is_worker_username(self.ctx_user)
-                authentified = (
-                    self.runtime.auth.do_worker_login(**terms) if is_worker else self.runtime.auth.do_login(**terms)
-                )
+                authentified = self.runtime.auth.do_login(**terms)
                 if not authentified:
                     self.runtime.logger.error("Authentication failure, exiting")
                     sys.exit(1)

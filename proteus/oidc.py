@@ -28,7 +28,6 @@ class OIDC:
         host = proteus.config.auth_host
 
         self.proteus = proteus
-        self.username = proteus.config.username
         self.host = host if host.endswith("/auth") else host + "/auth"
         self.realm = proteus.config.realm
         self.client_id = proteus.config.client_id
@@ -40,10 +39,25 @@ class OIDC:
         self._when_refresh_callback = None
         self._update_credentials()
         self._i_am_robot = False
+        self.username = self.proteus.config.username
+        self.password = self.proteus.config.password
 
         # Register insists
         self.send_login_request = proteus.may_insist_up_to(3, delay_in_secs=1)(self.send_login_request)
         self.send_login_request = proteus.may_insist_up_to(5, delay_in_secs=1)(self.send_refresh_request)
+
+    _username = None
+
+    @property
+    def username(self):
+        return self._username
+
+    @username.setter
+    def username(self, val):
+        self._username = val
+
+        if self._username:
+            self._i_am_robot = is_worker_username(self._username)
 
     def _update_credentials(
         self,
@@ -107,10 +121,14 @@ class OIDC:
         return response
 
     def do_login(self, password=None, username=None, auto_update=True):
+
+        self.username = self.username if username is None else username
+        self.password = self.password if password is None else password
+
         login = {
             "grant_type": "password",
-            "username": self.username if username is None else username,
-            "password": password or self.proteus.config.password,
+            "username": username,
+            "password": password,
             "client_id": self.client_id,
         }
         if self.client_secret is not None:
@@ -126,13 +144,6 @@ class OIDC:
         if auto_update is True:
             self.prepare_refresh()
         return True
-
-    def do_worker_login(self, **terms):
-        self.realm = self.realm
-        self.client_id = self.client_id
-        self.client_secret = self.client_secret
-        self._i_am_robot = True
-        return self.do_login(**terms)
 
     def prepare_refresh(self):
         assert self.expires_in is not None
@@ -171,7 +182,7 @@ class OIDC:
             self._update_credentials(**credentials)
         except Exception:
             self.proteus.logger.error("Failed to refresh token, re-loging againg")
-            return self.do_login()
+            return self.do_login(auto_update=False)
         finally:
             self._access_token_locked.release()
         if self._when_refresh_callback is not None:
