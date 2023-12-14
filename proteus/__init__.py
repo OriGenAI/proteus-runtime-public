@@ -18,8 +18,8 @@ class Proteus:
     def __init__(self, config: Config = None) -> None:
         self.config: Config = config or Config()
         self.logger = initialize_logger(self.config.log_loc)
-        self.auth = OIDC(self)
         self.api = API(self)
+        self.auth = OIDC(self)
         self.reporting = Reporting(self)
         self.run_stats = RunExecutionStats(self)
         self.vault = Vault(self)

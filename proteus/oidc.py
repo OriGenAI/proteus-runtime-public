@@ -2,9 +2,11 @@ import base64
 import json
 import re
 from threading import Timer, Lock
+from urllib.parse import urlparse
 
 import certifi
 import requests
+from requests import HTTPError
 
 
 class RepeatTimer(Timer):
@@ -28,8 +30,9 @@ class OIDC:
         host = proteus.config.auth_host
 
         self.proteus = proteus
-        self.host = host if host.endswith("/auth") else host + "/auth"
+        self.host = host
         self.realm = proteus.config.realm
+
         self.client_id = proteus.config.client_id
         self.client_secret = proteus.config.client_secret
         self._access_token_locked = Lock()
@@ -88,6 +91,14 @@ class OIDC:
         return self._refresh_token
 
     @property
+    def host(self):
+        return self._host
+
+    @host.setter
+    def host(self, host_or_url):
+        self._host = urlparse(host_or_url).hostname or host_or_url
+
+    @property
     def expires_in(self):
         return self._expires_in
 
@@ -95,10 +106,56 @@ class OIDC:
     def refresh_expires_in(self):
         return self._resfresh_expires_in
 
+    _oidc_config = None
+
     @property
-    def url(self):
-        path = f"{self.host}/realms/{self.realm}" "/protocol/openid-connect/token"
-        return path.format(self=self)
+    def oidc_config(self):
+        if self._oidc_config is None:
+            self._oidc_config = {"is_url_legacy": True}
+
+            try:
+                response = requests.get(self.url_oidc_config)
+                self.proteus.api.raise_for_status(response)
+            except HTTPError:
+                self._oidc_config = {"is_url_legacy": False}
+
+                response = requests.get(self.url_oidc_config)
+
+            try:
+                self.proteus.api.raise_for_status(response)
+            except HTTPError:
+                self._oidc_config = None
+                raise
+
+            real_is_url_legacy = self._oidc_config["is_url_legacy"]
+            self._oidc_config = response.json()
+            self._oidc_config["is_url_legacy"] = real_is_url_legacy
+
+        return self._oidc_config
+
+    @property
+    def is_url_legacy(self):
+        return self.oidc_config["is_url_legacy"]
+
+    @property
+    def base_url(self):
+        return self.base_url_legacy if self.is_url_legacy else f"https://{self.host}"
+
+    @property
+    def base_url_legacy(self):
+        return f"https://{self.host}/auth"
+
+    @property
+    def url_realm(self):
+        return f"{self.base_url}/realms/{self.realm}"
+
+    @property
+    def url_oidc_config(self):
+        return self.url_realm + "/.well-known/openid-configuration"
+
+    @property
+    def url_token(self):
+        return self.url_realm + "/protocol/openid-connect/token"
 
     def when_login(self, callback):
         self._when_login_callback = callback
@@ -109,7 +166,7 @@ class OIDC:
     # @may_insist_up_to(3, delay_in_secs=1)
     def send_login_request(self, login):
         response = requests.post(
-            self.url,
+            self.url_token,
             data=login,
             verify=certifi.where(),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -157,7 +214,7 @@ class OIDC:
     # @may_insist_up_to(5, delay_in_secs=1)
     def send_refresh_request(self, refresh):
         response = requests.post(
-            self.url,
+            self.url_token,
             data=refresh,
             verify=certifi.where(),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
