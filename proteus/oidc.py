@@ -184,8 +184,8 @@ class OIDC:
 
         login = {
             "grant_type": "password",
-            "username": username,
-            "password": password,
+            "username": self.username,
+            "password": self.password,
             "client_id": self.client_id,
         }
         if self.client_secret is not None:
