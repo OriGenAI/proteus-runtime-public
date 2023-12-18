@@ -8,6 +8,8 @@ import certifi
 import requests
 from requests import HTTPError
 
+from proteus.utils import get_random_string
+
 
 class RepeatTimer(Timer):
     def run(self):
@@ -48,6 +50,8 @@ class OIDC:
         # Register insists
         self.send_login_request = proteus.may_insist_up_to(3, delay_in_secs=1)(self.send_login_request)
         self.send_login_request = proteus.may_insist_up_to(5, delay_in_secs=1)(self.send_refresh_request)
+
+        self.admin = OIDCAdmin(self)
 
     _username = None
 
@@ -148,6 +152,10 @@ class OIDC:
     @property
     def url_realm(self):
         return f"{self.base_url}/realms/{self.realm}"
+
+    @property
+    def url_realm_admin(self):
+        return f"{self.base_url}/admin/realms/{self.realm}"
 
     @property
     def url_oidc_config(self):
@@ -273,3 +281,83 @@ class OIDC:
             if robot_match is not None:
                 return robot_match.groupdict().get("uuid")
         return None
+
+
+class OIDCAdmin:
+    def __init__(
+        self,
+        oidc: OIDC,
+    ):
+        self.auth = oidc
+
+    def search_username_id(self, username):
+        response = requests.get(
+            f"{self.auth.url_realm}/users",
+            params={"username": username},
+            verify=certifi.where(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer {}".format(self.auth.access_token),
+            },
+        )
+
+        results = response.json()
+        if len(results) == 0:
+            raise RuntimeError(f"User {username} not found")
+
+        if len(results) > 1:
+            raise RuntimeError(f"More than one user with username {username}")
+
+        return results[0].get("id")
+
+    def change_password(self, username, password):
+        assert self.auth is not None
+
+        id_ = self.search_username_id(username)
+
+        update = {"credentials": [{"type": "password", "temporary": False, "value": password}]}
+        response = requests.put(
+            f"{self.auth.url_realm}/users/{id_}",
+            json=update,
+            verify=certifi.where(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer {}".format(self.auth.access_token),
+            },
+        )
+
+        self.auth.proteus.api.raise_for_status(response)
+        return username, password
+
+    def create(self, username, email, /, roles=tuple(), password=None):
+        assert self.auth is not None
+
+        url = f"{self.auth.url_realm_admin}/users"
+        password = get_random_string(32) if password is None else password
+
+        creation = {
+            "enabled": "true",
+            "username": username,
+            "credentials": [{"type": "password", "temporary": False, "value": password}],
+            "realmRoles": list(roles),
+            "groups": roles,
+            "email": email,
+        }
+
+        response = requests.post(
+            url,
+            json=creation,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer {}".format(self.auth.access_token),
+            },
+        )
+
+        return self.change_password(username, password)
+
+        self.auth.proteus.api.raise_for_status(response)
+
+        if response.status_code != 201:
+            raise RuntimeError(f"could not confirm user creation: {creation} " f"on {url}. {self.auth.access_token}")
+
+        return username, password
