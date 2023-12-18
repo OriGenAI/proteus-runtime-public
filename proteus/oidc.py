@@ -292,7 +292,7 @@ class OIDCAdmin:
 
     def search_username_id(self, username):
         response = requests.get(
-            f"{self.auth.url_realm}/users",
+            f"{self.auth.url_realm_admin}/users",
             params={"username": username},
             verify=certifi.where(),
             headers={
@@ -317,7 +317,7 @@ class OIDCAdmin:
 
         update = {"credentials": [{"type": "password", "temporary": False, "value": password}]}
         response = requests.put(
-            f"{self.auth.url_realm}/users/{id_}",
+            f"{self.auth.url_realm_admin}/users/{id_}",
             json=update,
             verify=certifi.where(),
             headers={
@@ -353,7 +353,8 @@ class OIDCAdmin:
             },
         )
 
-        return self.change_password(username, password)
+        if response.status_code == 409:
+            return self.change_password(username, password)
 
         self.auth.proteus.api.raise_for_status(response)
 
