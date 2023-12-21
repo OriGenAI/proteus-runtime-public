@@ -6,7 +6,7 @@ import shutil
 
 from pathlib import Path
 
-FALLBACK_LOGGING_PATH = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), "logging.ini")
+FALLBACK_LOGGING_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), "logging.ini")
 
 
 def initialize_logger(log_loc=None):
