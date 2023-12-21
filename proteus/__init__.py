@@ -7,6 +7,7 @@ from .bucket import Bucket
 from .config import Config
 from .logger import initialize_logger
 from .oidc import OIDC
+from .pubsub import ProteusPubSub
 from .reporting import Reporting
 from .runs import Runs
 from .safe import Safely
@@ -26,6 +27,7 @@ class Proteus:
         self.bucket = Bucket(self)
         self.runs = Runs(self)
         self.safely = Safely(self)
+        self.pubsub = ProteusPubSub(self)
 
     def runs_authentified(self, func=None, user=None, password=None):
         """Decorator that authentifies and keeps token updated during execution."""

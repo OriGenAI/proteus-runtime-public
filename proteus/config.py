@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from envclasses import load_env, envclass
+import hashlib
 
 
 @envclass
@@ -37,6 +38,16 @@ class Config:
     safely_key: Optional[str] = None
     safely_key_type: Optional[str] = "aes256"
 
+    mqtt_broker_url: Optional[str] = None
+    mqtt_broker_port: Optional[int] = None
+    mqtt_keep_alive: Optional[int] = 60
+    mqtt_token: Optional[str] = None
+
+    @property
+    def mqtt_id(self):
+        combined = f"{self.mqtt_broker_url}-{self.safely_image}-{self.safely_key}-{self.username}-{self.password}"
+        return hashlib.sha256(combined.encode()).hexdigest()
+
     @classmethod
     def auto(cls, *args, **kwargs):
         to_remove_from_environ = set()
@@ -55,6 +66,9 @@ class Config:
             ("OIDC_REALM", "REALM"),
             ("CURRENT_IMAGE", "SAFELY_IMAGE"),
             ("SAFETY_PATH", "SAFELY_PATH"),
+            ("MQTT_BROKER_URL", "MQTT_BROKER_URL"),
+            ("MQTT_BROKER_PORT", "MQTT_BROKER_PORT"),
+            ("MQTT_KEEP_ALIVE", "MQTT_KEEP_ALIVE"),
         ):
             if final_name not in os.environ and alternate_name in os.environ:
                 os.environ[final_name] = os.environ[alternate_name]

@@ -301,6 +301,8 @@ class OIDCAdmin:
             },
         )
 
+        self.auth.proteus.api.raise_for_status(response)
+
         results = response.json()
         if len(results) == 0:
             raise RuntimeError(f"User {username} not found")
