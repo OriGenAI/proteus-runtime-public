@@ -165,6 +165,10 @@ class OIDC:
     def url_token(self):
         return self.url_realm + "/protocol/openid-connect/token"
 
+    @property
+    def url_certs(self):
+        return self.url_realm + "/protocol/openid-connect/certs"
+
     def when_login(self, callback):
         self._when_login_callback = callback
 

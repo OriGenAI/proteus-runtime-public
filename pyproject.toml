@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "proteus-runtime"
-version = "0.5.6"
+version = "0.5.7"
 description = ""
 authors = []
 packages = [
