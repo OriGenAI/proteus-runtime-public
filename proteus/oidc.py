@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import certifi
 import requests
+from black import contextmanager
 from requests import HTTPError
 
 from proteus.utils import get_random_string
@@ -29,14 +30,10 @@ class OIDC:
         self,
         proteus,
     ):
-        host = proteus.config.auth_host
-
         self.proteus = proteus
-        self.host = host
-        self.realm = proteus.config.realm
 
-        self.client_id = proteus.config.client_id
-        self.client_secret = proteus.config.client_secret
+        self.set_config()
+
         self._access_token_locked = Lock()
         self._last_res = None
         self._refresh_timer = None
@@ -44,8 +41,6 @@ class OIDC:
         self._when_refresh_callback = None
         self._update_credentials()
         self._i_am_robot = False
-        self.username = self.proteus.config.username
-        self.password = self.proteus.config.password
 
         # Register insists
         self.send_login_request = proteus.may_insist_up_to(3, delay_in_secs=1)(self.send_login_request)
@@ -54,6 +49,41 @@ class OIDC:
         self.admin = OIDCAdmin(self)
 
     _username = None
+
+    def set_config(
+        self,
+        host: str = None,
+        realm: str = None,
+        client_id: str = None,
+        client_secret: str = None,
+        username: str = None,
+        password: str = None,
+    ):
+        self.host = host or self.proteus.config.auth_host
+        self.realm = realm or self.proteus.config.realm
+
+        self.client_id = client_id or self.proteus.config.client_id
+        self.client_secret = client_secret or self.proteus.config.client_secret
+
+        self.username = username or self.proteus.config.username
+        self.password = password or self.proteus.config.password
+
+        self.stop()
+
+        self._i_am_robot = None
+
+        self._oidc_config = None
+
+        self._access_token = None
+        self._refresh_token = None
+        self._expires_in = None
+        self._resfresh_expires_in = None
+
+    @contextmanager
+    def override_config(self, **kwargs):
+        self.set_config(**kwargs)
+        yield
+        self.set_config()
 
     @property
     def username(self):
@@ -258,7 +288,7 @@ class OIDC:
             self._when_refresh_callback()
 
     def stop(self):
-        if self._refresh_timer is not None:
+        if getattr(self, "_refresh_timer", None) is not None:
             self._refresh_timer.cancel()
 
     @property
