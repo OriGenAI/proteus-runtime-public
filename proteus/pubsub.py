@@ -2,8 +2,6 @@ import json
 import typing
 from contextlib import asynccontextmanager
 
-from asyncio_mqtt import Client
-
 if typing.TYPE_CHECKING:
     from . import Proteus
 
@@ -14,6 +12,8 @@ class ProteusPubSub:
 
     @asynccontextmanager
     async def connect(self, token):
+        from asyncio_mqtt import Client
+
         client = Client(
             hostname=self.proteus.config.mqtt_broker_url,
             port=self.proteus.config.mqtt_broker_port,
