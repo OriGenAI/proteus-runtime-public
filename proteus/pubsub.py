@@ -26,6 +26,7 @@ class ProteusPubSub:
             yield ProteusPubSubContext(client)
         except Exception as e:
             self.proteus.logger.error(f"Error connecting MQTT: {e}")
+            yield
         else:
             await client.disconnect()
 
