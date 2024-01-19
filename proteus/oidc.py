@@ -1,12 +1,12 @@
 import base64
 import json
 import re
+from contextlib import contextmanager
 from threading import Timer, Lock
 from urllib.parse import urlparse
 
 import certifi
 import requests
-from black import contextmanager
 from requests import HTTPError
 
 from proteus.utils import get_random_string
