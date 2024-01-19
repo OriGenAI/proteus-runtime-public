@@ -7,6 +7,9 @@ on:
   pull_request:
     branches:
       - dev
+  pull_request_target:
+    branches:
+      - dev
 
 jobs:
   build:
@@ -14,11 +17,11 @@ jobs:
     steps:
       # Install poetry (to obtain version and run tests) and virtualenv (to ensure poetry creates its virtual
       # environment inside this path)
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install poetry virtualenv
-
       # Checkout the dev-release path to know which was the last version that was released
       - uses: actions/checkout@v3
         with:
@@ -29,7 +32,6 @@ jobs:
       - name: Obtain the last released version
         run: |
           echo "release_proj_version=`poetry version -s`" >> $GITHUB_ENV
-
       # Go back to this workflow's branch
       - uses: actions/checkout@v3
         with:
@@ -41,7 +43,7 @@ jobs:
           echo "proj_version=`poetry version -s`" >> $GITHUB_ENV
 
       - name: Check if version has been bumped
-        if: ${{ env.release_proj_version == env.proj_version }}
+        if: github.ref == 'refs/heads/dev-deploy' && env.release_proj_version == env.proj_version
         run: |
           echo "The last released version is the same as the new one, please update the version on project.py: ${{ env.release_proj_version }} vs ${{ env.proj_version }}"
           exit 1
