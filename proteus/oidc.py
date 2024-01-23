@@ -32,9 +32,11 @@ class OIDC:
     ):
         self.proteus = proteus
 
+        self._access_token_locked = Lock()
+        self._refresh_lock = Lock()
+
         self.set_config()
 
-        self._access_token_locked = Lock()
         self._last_res = None
         self._refresh_timer = None
         self._when_login_callback = None
@@ -220,6 +222,13 @@ class OIDC:
         return response
 
     def do_login(self, password=None, username=None, auto_update=True):
+        """
+
+        :param password:
+        :param username:
+        :param auto_update:
+        :return: True if the token refereshener was installed, false otherwise
+        """
 
         self.username = self.username if username is None else username
         self.password = self.password if password is None else password
@@ -241,17 +250,33 @@ class OIDC:
             self._when_login_callback()
         self._update_credentials(**credentials)
         if auto_update is True:
-            self.prepare_refresh()
-        return True
+            return self.prepare_refresh()
+        return False
+
+    @property
+    def refresh_enabled(self):
+        return self._refresh_timer is not None
 
     def prepare_refresh(self):
-        assert self.expires_in is not None
+        with self._refresh_lock:
+            assert self.expires_in is not None
 
-        def perform_refresh():
-            self.do_refresh()
+            if self._refresh_timer is not None:
+                return False
 
-        self._refresh_timer = RepeatTimer(self.expires_in - self.proteus.config.refresh_gap, perform_refresh)
-        self._refresh_timer.start()
+            def perform_refresh():
+                self.do_refresh()
+
+            self._refresh_timer = RepeatTimer(self.expires_in - self.proteus.config.refresh_gap, perform_refresh)
+            self._refresh_timer.start()
+
+            return True
+
+    def stop(self):
+        with self._refresh_lock:
+            if getattr(self, "_refresh_timer", None) is not None:
+                self._refresh_timer.cancel()
+                self._refresh_timer = None
 
     # @may_insist_up_to(5, delay_in_secs=1)
     def send_refresh_request(self, refresh):
@@ -286,10 +311,6 @@ class OIDC:
             self._access_token_locked.release()
         if self._when_refresh_callback is not None:
             self._when_refresh_callback()
-
-    def stop(self):
-        if getattr(self, "_refresh_timer", None) is not None:
-            self._refresh_timer.cancel()
 
     @property
     def am_i_robot(self):

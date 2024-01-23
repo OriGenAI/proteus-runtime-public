@@ -1,4 +1,3 @@
-import sys
 import time
 from functools import wraps
 
@@ -37,18 +36,16 @@ class Proteus:
                 self.runtime = runtime
                 self.ctx_user = ctx_user
                 self.ctx_password = ctx_password
+                self.refresh_installed = False
 
             def __enter__(self):
                 terms = dict(username=self.ctx_user, password=self.ctx_password, auto_update=True)
-                authentified = self.runtime.auth.do_login(**terms)
-                if not authentified:
-                    self.runtime.logger.error("Authentication failure, exiting")
-                    sys.exit(1)
-
+                self.refresh_installed = self.runtime.auth.do_login(**terms)
                 self.runtime.logger.info(f"Welcome, {self.runtime.auth.who}")
 
             def __exit__(self, exc_type, exc_val, exc_tb):
-                self.runtime.auth.stop()
+                if self.refresh_installed:
+                    self.runtime.auth.stop()
 
         if not func:
             return RunsAuthentifiedContextManager(runtime=self, ctx_user=user, ctx_password=password)
