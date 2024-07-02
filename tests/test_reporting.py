@@ -1,8 +1,7 @@
 import pytest
-from pytest_bdd import scenario, given, when, then, parsers
-
 from proteus import Proteus
 from proteus.reporting import Reporting
+from pytest_bdd import given, parsers, scenario, then, when
 
 proteus = Proteus()
 
@@ -73,7 +72,7 @@ def send_report(reporting, msg):
 
 @then("the mocked api is called once")
 def mocked_api_called_once(mocked_api_post):
-    assert mocked_api_post.called_once()
+    assert mocked_api_post.call_count == 1
 
 
 @then("the message is in the standard output")

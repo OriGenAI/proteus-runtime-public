@@ -4,98 +4,99 @@
 
 name: Release & push to public repository
 on:
-  push:
-    branches:
-      - dev-deploy
+    push:
+        branches:
+            - dev-deploy
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      # Install poetry (to obtain version and run tests) and virtualenv (to ensure poetry creates its virtual
-      # environment inside this path)
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry virtualenv
+    build:
+        runs-on: ubuntu-latest
+        container: python:3.12-slim-bookworm
+        steps:
+            # Install poetry (to obtain version and run tests) and virtualenv (to ensure poetry creates its virtual
+            # environment inside this path)
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install poetry virtualenv
 
-      # Checkout the dev-release path to know which was the last version that was released
-      - uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-          ref: dev-release
+            # Checkout the dev-release path to know which was the last version that was released
+            - uses: actions/checkout@v3
+              with:
+                  persist-credentials: false
+                  fetch-depth: 0
+                  ref: dev-release
 
-      - name: Obtain the last released version
-        run: |
-          echo "release_proj_version=`poetry version -s`" >> $GITHUB_ENV
+            - name: Obtain the last released version
+              run: |
+                  echo "release_proj_version=`poetry version -s`" >> $GITHUB_ENV
 
-      # Go back to this workflow's branch
-      - uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-          fetch-depth: 0
+            # Go back to this workflow's branch
+            - uses: actions/checkout@v3
+              with:
+                  persist-credentials: false
+                  fetch-depth: 0
 
-      - name: Obtain the version want to release now
-        run: |
-          echo "proj_version=`poetry version -s`" >> $GITHUB_ENV
+            - name: Obtain the version want to release now
+              run: |
+                  echo "proj_version=`poetry version -s`" >> $GITHUB_ENV
 
-      - name: Check if version has been bumped
-        if: ${{ env.release_proj_version == env.proj_version }}
-        run: |
-          echo "The last released version is the same as the new one, please update the version on project.py: ${{ env.release_proj_version }} vs ${{ env.proj_version }}"
-          exit 1
+            - name: Check if version has been bumped
+              if: ${{ env.release_proj_version == env.proj_version }}
+              run: |
+                  echo "The last released version is the same as the new one, please update the version on project.py: ${{ env.release_proj_version }} vs ${{ env.proj_version }}"
+                  exit 1
 
-      - name: Run tests
-        run: |
-          virtualenv .env
-          poetry env use ./.env/bin/python
-          poetry config virtualenvs.create false
-          poetry install
-          poetry run poe test
-          rm -rf .env
+            - name: Run tests
+              run: |
+                  virtualenv .env
+                  poetry env use ./.env/bin/python
+                  poetry config virtualenvs.create false
+                  poetry install
+                  poetry run poe test
+                  rm -rf .env
 
-      - name: Squash changes and store into release
-        run: |
-          git config --local user.name $GITHUB_USERNAME
-          git config --local user.email $GITHUB_EMAIL
-          mkdir ./temp
-          mv .git/ ./temp/
-          cd ./temp
-          git checkout dev-release
-          mv .git/ ..
-          cd ..
-          rm -rf temp
-          git add .
-          git commit -am "update version ${{ env.proj_version }}"
-        env:
-          GITHUB_USERNAME: github-actions[bot]
-          GITHUB_EMAIL: github-actions[bot]@users.noreply.github.com
+            - name: Squash changes and store into release
+              run: |
+                  git config --local user.name $GITHUB_USERNAME
+                  git config --local user.email $GITHUB_EMAIL
+                  mkdir ./temp
+                  mv .git/ ./temp/
+                  cd ./temp
+                  git checkout dev-release
+                  mv .git/ ..
+                  cd ..
+                  rm -rf temp
+                  git add .
+                  git commit -am "update version ${{ env.proj_version }}"
+              env:
+                  GITHUB_USERNAME: github-actions[bot]
+                  GITHUB_EMAIL: github-actions[bot]@users.noreply.github.com
 
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: dev-release
+            - name: Push changes
+              uses: ad-m/github-push-action@master
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  branch: dev-release
 
-      - uses: actions/checkout@v3
-        with:
-          repository: OriGenAI/proteus-runtime-public
-          persist-credentials: true
-          ssh-key: ${{ secrets.PROTEUS_RUNTIME_PUBLIC_SSH_DEPLOYMENT_KEY }}
-          ref: dev
+            - uses: actions/checkout@v3
+              with:
+                  repository: OriGenAI/proteus-runtime-public
+                  persist-credentials: true
+                  ssh-key: ${{ secrets.PROTEUS_RUNTIME_PUBLIC_SSH_DEPLOYMENT_KEY }}
+                  ref: dev
 
-      - name: Merge Upstream
-        uses: exions/merge-upstream@v1
-        with:
-          upstream: OriGenAI/proteus-runtime
-          upstream-branch: dev-release
-          branch: dev
-          token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Merge Upstream
+              uses: exions/merge-upstream@v1
+              with:
+                  upstream: OriGenAI/proteus-runtime
+                  upstream-branch: dev-release
+                  branch: dev
+                  token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          ssh: true
-          repository: OriGenAI/proteus-runtime-public
-          branch: dev
+            - name: Push changes
+              uses: ad-m/github-push-action@master
+              with:
+                  ssh: true
+                  repository: OriGenAI/proteus-runtime-public
+                  branch: dev
