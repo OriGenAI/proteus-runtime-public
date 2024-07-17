@@ -38,16 +38,7 @@ class RunExecutionStats:
         path = self.series_path.format(run_e_id=run_e_id)
         return self.proteus.api.get(path)
 
-    def create_series(
-        self,
-        run_e_id: str,
-        slug: str,
-        label: str,
-        data: list,
-        x_label: str,
-        y_label: str,
-        default_scale: str = "logarithmic",
-    ) -> Response:
+    def create_series(self, run_e_id: str, slug: str, label: str, data: list, x_label: str, y_label: str) -> Response:
         path = self.series_path.format(run_e_id=run_e_id)
         payload = {
             "slug": slug,
@@ -56,7 +47,6 @@ class RunExecutionStats:
             "data": data,
             "x_label": x_label,
             "y_label": y_label,
-            "default_scale": default_scale,
         }
         return self.proteus.api.post(path, payload)
 
@@ -245,13 +235,7 @@ class SeriesHelper:
         except HTTPError as e:
             if e.response.status_code == 404:
                 response = self.proteus.run_stats.create_series(
-                    self.run_execution_id,
-                    serie.slug,
-                    serie.label,
-                    [],
-                    serie.x_label,
-                    serie.y_label,
-                    serie.default_scale,
+                    self.run_execution_id, serie.slug, serie.label, [], serie.x_label, serie.y_label
                 )
                 series_id = response.json()["id"]
             else:

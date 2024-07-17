@@ -1,57 +1,45 @@
 [tool.poetry]
 name        = "proteus-runtime"
-version     = "0.6.0"
+version     = "0.5.20"
 description = ""
 authors     = []
 packages    = [{ include = "proteus" }]
 
     [tool.poetry.dependencies]
-    python             = "~3.12"
-    python-json-logger = "^2.0.4"
-    requests           = "^2.28.1"
-    setuptools         = "^70.0.0"
-    parglare           = "0.18"
+    python             = "^3.8"
     azure-storage-blob = "^12.14.1"
-    multipart          = "^0.2.4"
-    tqdm               = "^4.65.0"
-    python-slugify     = "^8.0.1"
-    pycryptodome       = "^3.20"
     envclasses         = "^0.3.1"
-    numpy              = "^2.0.0"
-    poethepoet         = "^0.27.0"
+    multipart          = "^0.2.4"
+    numpy              = "^1.0.0"
+    parglare           = "^0.16.0"
+    pycryptodome       = "^3.20.0"
+    python-json-logger = "^2.0.4"
+    python-slugify     = "^8.0.1"
+    requests           = "^2.28.1"
+    setuptools         = "^70"
+    tqdm               = "^4.65.0"
+
 
     [tool.poetry.group.dev.dependencies]
-    black         = "^24"
-    python-dotenv = "^1.0.1"
-    pytest        = "^7.2.0"
-    pytest-mock   = "^3.5.1"
-    requests-mock = "^1.8.0"
-    pytest-bdd    = "^5.0.0"
-    pytest-cov    = "^5.0.0"
     PyJWT         = "^2.4.0"
     asyncio-mqtt  = "^0.16.2"
     paho-mqtt     = "^2.1.0"
-    pyflakes      = "^3.2.0"
+    poethepoet    = "^0.27.0"
+    pytest        = "^7.2.0"
+    pytest-bdd    = "^5.0.0"
+    pytest-cov    = "^3.0.0"
+    pytest-mock   = "^3.5.1"
+    python-dotenv = "^1.0.1"
+    requests-mock = "^1.8.0"
 
 [tool.poe.tasks]
-test   = ['black_check', 'pytest']
-format = ["black_format"]
+# Composing commands
+test = ['pytest']
 
-    [tool.poe.tasks.black_check]
-    cmd = """
-            black proteus --check --diff
-                --line-length=120
-        """
-    help = "Check code style using black does not refactor"
     [tool.poe.tasks.pytest]
     cmd  = "pytest tests"
     help = "Run python tests"
 
-    [tool.poe.tasks.black_format]
-    cmd = """
-            black . --line-length=120
-        """
-    help = "Refactor using black"
 
 [build-system]
 requires      = ["poetry-core>=1.0.0"]
